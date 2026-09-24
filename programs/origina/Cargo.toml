@@ -1,0 +1,19 @@
+[package]
+name = "origina"
+version = "0.1.0"
+description = "Origina Protocol: on-chain provenance anchoring for AI-generated media"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "origina"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ip = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.30.1"

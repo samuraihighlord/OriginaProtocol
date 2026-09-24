@@ -1,0 +1,30 @@
+# Rust / Anchor
+/target
+**/*.rs.bk
+.anchor/
+test-ledger/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+coverage/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Solana keypairs (never commit)
+*-keypair.json
+id.json
