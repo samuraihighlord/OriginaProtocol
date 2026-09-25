@@ -9,7 +9,7 @@ pub struct InitRegistry<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 +RegistryAccount::INIT_SPACE,
+        space = 8 + RegistryAccount::INIT_SPACE,
         seeds = [b"registry"],
         bump
     )]

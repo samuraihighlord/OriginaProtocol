@@ -10,4 +10,12 @@ pub enum RegistryError {
     Unauthorized,
     #[msg("No Pending Authority")]
     NoPendingAuthority,
+    #[msg("Invalid Name")]
+    InvalidName,
+    #[msg("Invalid Provider")]
+    InvalidProvider,
+    #[msg("Invalid Cert Identity")]
+    InvalidCertIdentity,
+    #[msg("Invalid Refund Account")]
+    InvalidRefundAccount,
 }
