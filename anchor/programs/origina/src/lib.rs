@@ -13,6 +13,8 @@ declare_id!("8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi");
 
 #[program]
 pub mod origina {
+    use crate::instructions::__cpi_client_accounts_revoke_provider::RevokeProvider;
+
     use super::*;
 
     pub fn init_registry(ctx: Context<InitRegistry>) -> Result<()> {
@@ -52,5 +54,20 @@ pub mod origina {
         provider: Pubkey,
     ) -> Result<()> {
         instructions::cancel_provider_approval::handler(ctx, provider)
+    }
+
+    pub fn revoke_provider(
+        ctx: Context<(RevokeProvider)>,
+        provider: Pubkey,
+        reason: RevocationReason,
+    ) -> Result<()> {
+        instructions::revoke_provider::handler(ctx, provider, reason)
+    }
+
+    pub fn self_revoke_provider(
+        ctx: Context<SelfRevokeProvider>,
+        reason: RevocationReason,
+    ) -> Result<()> {
+        instructions::self_revoke_provider::handler(ctx, reason)
     }
 }
