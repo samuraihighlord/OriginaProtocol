@@ -4,7 +4,6 @@ use anchor_lang::prelude::*;
 #[derive(InitSpace)]
 pub struct RegistryAccount {
     pub authority: Pubkey,
-    pub provider_count: u64,
     pub bump: u8,
 }
 
@@ -47,3 +46,4 @@ pub enum PerceptualAlg {
     None,
     PHash,
     Pdq,
+}
