@@ -18,4 +18,19 @@ pub mod origina {
     pub fn init_registry(ctx: Context<InitRegistry>) -> Result<()> {
         instructions::init_registry::handler(ctx)
     }
+
+    pub fn set_registry_authority(
+        ctx: Context<ProposeAuthority>,
+        pending_authority: Pubkey,
+    ) -> Result<()> {
+        instructions::propose_authority::handler(ctx, pending_authority)
+    }
+
+    pub fn accept_authority(ctx: Context<AcceptAuthority>) -> Result<()> {
+        instructions::accept_authority::handler(ctx)
+    }
+
+    pub fn cancel_authority_transfer(ctx: Context<CancelAuthorityTransfer>) -> Result<()> {
+        instructions::cancel_authority_transfer::handler(ctx)
+    }
 }

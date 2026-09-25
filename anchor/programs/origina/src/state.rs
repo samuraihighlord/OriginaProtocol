@@ -4,6 +4,7 @@ use anchor_lang::prelude::*;
 #[derive(InitSpace)]
 pub struct RegistryAccount {
     pub authority: Pubkey,
+    pub pending_authority: Option<Pubkey>,
     pub bump: u8,
 }
 
