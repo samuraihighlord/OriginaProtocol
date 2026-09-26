@@ -10,7 +10,7 @@ pub struct SelfRevokeProvider<'info> {
         seeds = [b"provider", provider.key().as_ref()],
         bump = provider_account.bump,
         constraint = provider_account.key == provider.key() @ RegistryError::Unauthorized,
-        constraint = provider_account.revocation.is_none() @ RegistryError::ProviderAlreadyRevoked,
+        constraint = provider_account.revocation.is_none() @ RegistryError::ProviderRevoked,
     )]
     pub provider_account: Account<'info, ProviderAccount>,
 }

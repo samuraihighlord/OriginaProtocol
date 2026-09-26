@@ -13,7 +13,6 @@ declare_id!("8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi");
 
 #[program]
 pub mod origina {
-    use crate::instructions::__cpi_client_accounts_revoke_provider::RevokeProvider;
 
     use super::*;
 
@@ -57,7 +56,7 @@ pub mod origina {
     }
 
     pub fn revoke_provider(
-        ctx: Context<(RevokeProvider)>,
+        ctx: Context<RevokeProvider>,
         provider: Pubkey,
         reason: RevocationReason,
     ) -> Result<()> {
@@ -69,5 +68,21 @@ pub mod origina {
         reason: RevocationReason,
     ) -> Result<()> {
         instructions::self_revoke_provider::handler(ctx, reason)
+    }
+
+    pub fn anchor_media(
+        ctx: Context<AnchorMedia>,
+        file_sha256: [u8; 32],
+        perceptual: Option<PerceptualHash>,
+        c2pa_manifest_hash: [u8; 32],
+        generated_at: Option<i64>,
+    ) -> Result<()> {
+        instructions::anchor_media::handler(
+            ctx,
+            file_sha256,
+            perceptual,
+            c2pa_manifest_hash,
+            generated_at,
+        )
     }
 }

@@ -1,4 +1,5 @@
 pub mod accept_authority;
+pub mod anchor_media;
 pub mod approve_provider;
 pub mod cancel_authority_transfer;
 pub mod cancel_provider_approval;
@@ -9,6 +10,7 @@ pub mod revoke_provider;
 pub mod self_revoke_provider;
 
 pub use accept_authority::*;
+pub use anchor_media::*;
 pub use approve_provider::*;
 pub use cancel_authority_transfer::*;
 pub use cancel_provider_approval::*;

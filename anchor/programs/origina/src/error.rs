@@ -18,8 +18,10 @@ pub enum RegistryError {
     InvalidCertIdentity,
     #[msg("Invalid Refund Account")]
     InvalidRefundAccount,
-    #[msg("Provider Already Revoked")]
-    ProviderAlreadyRevoked,
+    #[msg("Provider Revoked")]
+    ProviderRevoked,
     #[msg("Invalid Revocation Reason")]
     InvalidRevocationReason,
+    #[msg("Invalid Hash")]
+    InvalidHash,
 }

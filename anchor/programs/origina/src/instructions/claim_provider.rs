@@ -50,8 +50,8 @@ impl<'info> ClaimProvider<'info> {
             approved_by: self.provider_approval.approved_by,
             c2pa_cert_identity,
             activated_slot: slot,
-            revocation: None,
             bump: bumps.provider_account,
+            revocation: None,
         });
 
         emit!(ProviderRegistered {
