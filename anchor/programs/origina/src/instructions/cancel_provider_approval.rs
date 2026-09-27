@@ -28,7 +28,7 @@ pub struct CancelProviderApproval<'info> {
         close = approved_by,
     )]
     pub provider_approval: Account<'info, ProviderApproval>,
-    /// CHECK: used for pda validation
+    /// CHECK: refund recipient on close
     #[account(mut)]
     pub approved_by: UncheckedAccount<'info>,
 }

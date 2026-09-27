@@ -29,6 +29,10 @@ solana-message = "3.0.1"
 solana-transaction = "3.0.2"
 solana-signer = "3.0.0"
 solana-keypair = "3.0.1"
+solana-instruction = "4.0.0"
+solana-pubkey = "4.4.0"
+solana-sdk-ids = "3.1.0"
+solana-native-token = "3.0.0"
 
 
 [lints.rust]
