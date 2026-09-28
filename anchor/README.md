@@ -1,10 +1,10 @@
 # Origina
 
-Origina is an on-chain registry for AI-generated image provenace on Solana.
+Origina is an on-chain registry for AI-generated image provenance on Solana.
 
 Approved providers anchor records of each generated image on-chain with a SHA-256 of its file bytes, an optional perceptual hash, and a hash of its C2PA manifest. Anyone can look the file up on-chain, and see when it was anchored and by which provider. **No media is stored on chain.**
 
-## Content
+## Contents
 
 - [How it works](#how-it-works)
 - [Accounts](#accounts)
@@ -24,7 +24,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 
 | Account            | Seeds                                     | Purpose                                                                       |
 | ------------------ | ----------------------------------------- | ----------------------------------------------------------------------------- |
-| `RegistryAccount`  | `["registry"]`                            | One per Program. Current registry authority and pending authority transfer.   |
+| `RegistryAccount`  | `["registry"]`                            | One per program. Current registry authority and pending authority transfer.   |
 | `ProviderApproval` | `["approval", provider_pubkey]`           | Pending approval waiting for the provider's claim. Closed on claim or cancel. |
 | `ProviderAccount`  | `["provider", provider_pubkey]`           | Registered provider; never closed                                             |
 | `ProvenanceRecord` | `["media", provider_pubkey, file_sha256]` | One record per image per provider                                             |
@@ -63,8 +63,8 @@ anchor deploy --provider.cluster devnet
 ```
 Run `init_registry` immediately after deploying, signed by the deploying wallet (the upgrade authority). Verify with:
 ```bash
-solana program show <PROGRAM_ID> --url devnet
+solana program show 8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi --url devnet
 ```
 
 ## Program ID
-<PROGRAM_ID>
+8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi
