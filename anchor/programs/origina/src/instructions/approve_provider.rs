@@ -48,7 +48,7 @@ impl<'info> ApproveProvider<'info> {
         bumps: &ApproveProviderBumps,
     ) -> Result<()> {
         require!(
-            !name.is_empty() && name.len() <= MAX_NAME_LEN,
+            !name.is_empty() && name.len() <= MAX_NAME_LEN as usize,
             RegistryError::InvalidName
         );
         require!(

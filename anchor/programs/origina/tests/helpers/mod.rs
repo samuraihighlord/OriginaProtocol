@@ -13,7 +13,7 @@ use {
     solana_sdk_ids::{bpf_loader_upgradeable, system_program::ID as SYSTEM_PROGRAM_ID},
     solana_signer::Signer,
     solana_transaction::Transaction,
-    std::{path::PathBuf, str::FromStr},
+    std::path::PathBuf,
 };
 
 pub static PROGRAM_ID: Pubkey = origina::ID;
@@ -310,6 +310,20 @@ pub fn setup() -> TestConfig {
     let program_data =
         Pubkey::find_program_address(&[PROGRAM_ID.as_ref()], &bpf_loader_upgradeable::ID).0;
     let event_authority = Pubkey::find_program_address(&[b"__event_authority"], &PROGRAM_ID).0;
+
+    let mut pd = program
+        .get_account(&program_data)
+        .expect("ProgramData missing");
+    assert_eq!(
+        &pd.data[0..4],
+        &3u32.to_le_bytes(),
+        "not a ProgramData account"
+    );
+    pd.data[12] = 1;
+    pd.data[13..45].copy_from_slice(authority.pubkey().as_ref());
+    program
+        .set_account(program_data, pd)
+        .expect("failed to patch ProgramData");
 
     println!(
         "ProgramData exists: {}",

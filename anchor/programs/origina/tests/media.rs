@@ -2,8 +2,7 @@ mod helpers;
 use helpers::*;
 
 use anchor_lang::prelude::*;
-use origina::PerceptualHash;
-use solana_keypair::Keypair;
+use origina::{PerceptualHash, RevocationReason};
 use solana_signer::Signer;
 
 const MANIFEST: [u8; 32] = [9u8; 32];
