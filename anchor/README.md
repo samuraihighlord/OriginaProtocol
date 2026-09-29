@@ -17,7 +17,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 1. The registry authority approves providers after verifying their C2PA signing certificate off-chain.
 2. An approved provider claims its registration by signing with its own key.
 3. The provider anchors media at the point of generation. One on-chain record per file.
-4. To verify, the record address of a hashed file is derived and fetched.
+4. To verify, the recorded address of a hashed file is derived and fetched.
 5. Providers can be revoked by the authority or by themselves. Revocation is permanent. The revocation record remains.
 
 ## Accounts
