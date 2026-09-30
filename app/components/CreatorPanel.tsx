@@ -1,4 +1,4 @@
-import { AnchorResult, OriginaClient } from "@origina/sdk";
+import { AnchorResult, OriginaClient } from "../lib/originaClient";
 import { useState } from "react";
 import { formatDimensions, formatImageFormat, formatTimestamp, truncateMiddle } from "../format";
 import * as styles from "../styles";

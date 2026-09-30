@@ -2,28 +2,10 @@
   "name": "origina-protocol",
   "version": "0.1.0",
   "private": true,
-  "description": "Open-source infrastructure on Solana that permanently anchors a cryptographic fingerprint of AI-generated media at the moment of creation.",
+  "description": "Origina Protocol demo app. Backend/SDK/blockchain integration is supplied separately — see README.",
   "license": "MIT",
   "scripts": {
-    "build": "pnpm --filter @origina/sdk build",
-    "test": "pnpm --filter @origina/sdk test",
-    "test:anchor": "anchor test",
-    "dev:api": "pnpm --filter @origina/api dev",
+    "build": "pnpm --filter @origina/app build",
     "dev:app": "pnpm --filter @origina/app dev"
-  },
-  "dependencies": {
-    "@origina/sdk": "workspace:*"
-  },
-  "devDependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
-    "@solana/web3.js": "^1.95.3",
-    "@types/chai": "^4.3.16",
-    "@types/mocha": "^10.0.7",
-    "@types/node": "^20.14.9",
-    "chai": "^4.4.1",
-    "mocha": "^10.6.0",
-    "ts-mocha": "^10.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.5.3"
   }
 }

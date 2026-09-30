@@ -1,4 +1,4 @@
-import { OriginaClient } from "@origina/sdk";
+import { OriginaClient } from "../lib/originaClient";
 import { useMemo } from "react";
 import { CreatorPanel } from "../components/CreatorPanel";
 import { PlatformPanel } from "../components/PlatformPanel";

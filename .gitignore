@@ -1,9 +1,3 @@
-# Rust / Anchor
-/target
-**/*.rs.bk
-.anchor/
-test-ledger/
-
 # Node
 node_modules/
 dist/
@@ -24,7 +18,3 @@ coverage/
 # Editors
 .vscode/
 .idea/
-
-# Solana keypairs (never commit)
-*-keypair.json
-id.json

@@ -1,4 +1,5 @@
-import { detectImageFormat, OriginaClient, readImageDimensions, VerifyResult } from "@origina/sdk";
+import { detectImageFormat, readImageDimensions } from "../lib/imageMeta";
+import { OriginaClient, VerifyResult } from "../lib/originaClient";
 import { useState } from "react";
 import { formatDimensions, formatImageFormat, formatTimestamp, truncateMiddle } from "../format";
 import * as styles from "../styles";
