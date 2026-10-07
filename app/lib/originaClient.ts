@@ -1,14 +1,21 @@
 /**
- * Placeholder for the Origina backend integration.
+ * The Origina backend seam for this app.
  *
- * The actual fingerprint hashing, on-chain anchoring, and verification are
- * supplied by a separate contributor's SDK/API/blockchain program — not yet
- * wired into this demo app. The types and class below are the contract this
- * UI is built against; swap OriginaClient's method bodies for real calls
- * into their SDK/API once it's available. Until then, calling anchor() or
- * verify() fails with a clear "not connected" error, which the UI already
- * surfaces through its existing error states.
+ * The real fingerprint hashing, on-chain anchoring, and verification are being
+ * built separately (SDK / API / Solana program). Until that lands, this class
+ * stands in for them in the browser: fingerprints are computed locally and
+ * anchored records are held in an in-memory Map for the session, with a short
+ * delay standing in for the network round trip. Nothing is sent anywhere and
+ * nothing is written to Solana, so the chain-derived fields (pdaAddress, slot,
+ * explorerUrl) are null here and the UI omits them.
+ *
+ * The UI only uses the types and methods exported from this file. To connect
+ * the real backend, replace the bodies of anchor() and verify() (or this whole
+ * file) with calls into the SDK/API and keep these shapes — no other app code
+ * needs to change.
  */
+
+import { computePHash, computeSHA256, hammingDistance, NEAR_MATCH_THRESHOLD } from "./hash";
 
 export type MediaType = "image" | "video" | "audio" | "text";
 
@@ -17,20 +24,23 @@ export interface AnchorParams {
   modelId: string;
   mediaType: MediaType;
   walletPublicKey: string;
-  metadataUri?: string;
 }
 
 export interface AnchorResult {
-  signature: string;
-  pdaAddress: string;
+  /** The anchored record. If the file was anchored before, this is the original record. */
+  modelId: string;
+  creator: string;
   sha256: string;
+  /** 64-bit perceptual hash as 0x-prefixed hex. */
   phash: string;
+  /** Unix seconds. */
   timestamp: number;
-  slot: number;
-  explorerUrl: string;
-  width: number | null;
-  height: number | null;
-  format: string;
+  /** Chain-derived; null until the on-chain program is connected. */
+  slot: number | null;
+  pdaAddress: string | null;
+  explorerUrl: string | null;
+  /** True when this file was already anchored and the existing record was returned (anchors are immutable). */
+  alreadyAnchored?: boolean;
 }
 
 export interface VerifyParams {
@@ -41,16 +51,15 @@ export interface VerifyResult {
   found: boolean;
   exactMatch: boolean;
   nearMatch: boolean;
-  creator: string | null;
+  /** Hamming distance between perceptual hashes: 0 for an exact match, null when nothing matched. */
+  pHashDistance: number | null;
   modelId: string | null;
-  mediaType: MediaType | null;
+  creator: string | null;
+  sha256: string | null;
   timestamp: number | null;
+  slot: number | null;
   pdaAddress: string | null;
   explorerUrl: string | null;
-  pHashDistance: number | null;
-  width: number | null;
-  height: number | null;
-  format: string | null;
 }
 
 export interface OriginaClientOptions {
@@ -58,17 +67,105 @@ export interface OriginaClientOptions {
   cluster?: "devnet" | "mainnet-beta" | "testnet" | "localnet";
 }
 
-const NOT_CONNECTED =
-  "Origina backend not connected yet — this call is pending integration with the SDK/API/blockchain contributor's code.";
+interface StoredRecord {
+  sha256: string;
+  phash: bigint;
+  modelId: string;
+  creator: string;
+  timestamp: number;
+}
+
+const ANCHOR_LATENCY_MS = 1200;
+const VERIFY_LATENCY_MS = 900;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function phashHex(phash: bigint): string {
+  return "0x" + phash.toString(16).padStart(16, "0");
+}
 
 export class OriginaClient {
+  private readonly records = new Map<string, StoredRecord>();
+
   constructor(_options: OriginaClientOptions = {}) {}
 
-  async anchor(_params: AnchorParams): Promise<AnchorResult> {
-    throw new Error(`anchor(): ${NOT_CONNECTED}`);
+  async anchor(params: AnchorParams): Promise<AnchorResult> {
+    const sha256 = await computeSHA256(params.fileData);
+    const phash = computePHash(params.fileData);
+    await sleep(ANCHOR_LATENCY_MS);
+
+    let record = this.records.get(sha256);
+    const alreadyAnchored = record !== undefined;
+
+    if (!record) {
+      record = {
+        sha256,
+        phash,
+        modelId: params.modelId,
+        creator: params.walletPublicKey,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+      this.records.set(sha256, record);
+    }
+
+    return {
+      modelId: record.modelId,
+      creator: record.creator,
+      sha256: record.sha256,
+      phash: phashHex(record.phash),
+      timestamp: record.timestamp,
+      slot: null,
+      pdaAddress: null,
+      explorerUrl: null,
+      alreadyAnchored,
+    };
   }
 
-  async verify(_params: VerifyParams): Promise<VerifyResult> {
-    throw new Error(`verify(): ${NOT_CONNECTED}`);
+  async verify(params: VerifyParams): Promise<VerifyResult> {
+    const sha256 = await computeSHA256(params.fileData);
+    const phash = computePHash(params.fileData);
+    await sleep(VERIFY_LATENCY_MS);
+
+    const exact = this.records.get(sha256);
+    if (exact) return this.toVerifyResult(exact, true, 0);
+
+    let best: { record: StoredRecord; distance: number } | null = null;
+    for (const record of Array.from(this.records.values())) {
+      const distance = hammingDistance(phash, record.phash);
+      if (distance < NEAR_MATCH_THRESHOLD && (!best || distance < best.distance)) {
+        best = { record, distance };
+      }
+    }
+    if (best) return this.toVerifyResult(best.record, false, best.distance);
+
+    return {
+      found: false,
+      exactMatch: false,
+      nearMatch: false,
+      pHashDistance: null,
+      modelId: null,
+      creator: null,
+      sha256: null,
+      timestamp: null,
+      slot: null,
+      pdaAddress: null,
+      explorerUrl: null,
+    };
+  }
+
+  private toVerifyResult(record: StoredRecord, exact: boolean, distance: number): VerifyResult {
+    return {
+      found: true,
+      exactMatch: exact,
+      nearMatch: !exact,
+      pHashDistance: distance,
+      modelId: record.modelId,
+      creator: record.creator,
+      sha256: record.sha256,
+      timestamp: record.timestamp,
+      slot: null,
+      pdaAddress: null,
+      explorerUrl: null,
+    };
   }
 }

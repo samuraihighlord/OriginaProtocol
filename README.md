@@ -1,93 +1,105 @@
-# Origina Protocol — Demo App
+# Origina Protocol
 
 Origina Protocol is open-source infrastructure that permanently anchors a cryptographic fingerprint of AI-generated media at the moment of creation, so any platform can verify a file's origin, model, and authenticity — without ever storing, uploading, or transmitting the media file itself.
 
-**This repo is the demo app only.** The backend — fingerprint hashing, the API, the on-chain program, and the SDK that talks to them — is being built separately by another contributor and integrated here once ready. See [Backend integration](#backend-integration) below.
+This repo is the Origina web app (MVP). The backend — fingerprint hashing, the API, the on-chain Solana program, and the SDK that talks to them — is being built separately and plugs in through a single file, `app/lib/originaClient.ts`. Until it lands, that file stands in for it in the browser: records are held in memory for the session and are **not yet anchored on Solana**. See [Backend integration](#backend-integration).
 
 ## Repo structure
 
 ```
 origina-protocol/
-├── app/                       # @origina/app — Next.js demo (two-panel checker)
-│   ├── pages/index.tsx
+├── app/                        # @origina/app — Next.js web app
+│   ├── pages/
+│   │   ├── _app.tsx            # loads global styles
+│   │   ├── _document.tsx       # Inter + JetBrains Mono
+│   │   └── index.tsx           # page shell: nav, welcome modal, banners, the three pages
 │   ├── components/
-│   │   ├── CreatorPanel.tsx  # "AI Tool — Creator" panel (anchor flow)
-│   │   ├── PlatformPanel.tsx # "Platform" panel (verify flow)
-│   │   └── ImageDrop.tsx     # shared drag-and-drop upload
-│   └── lib/
-│       ├── originaClient.ts  # backend integration point — see below
-│       └── imageMeta.ts      # local, dependency-free image format/dimension reader
+│   │   ├── NavBar.tsx          # sticky nav, bottom tab bar on mobile, wallet menu
+│   │   ├── WelcomeModal.tsx    # first-visit introduction
+│   │   ├── Toast.tsx           # transient notifications
+│   │   ├── CursorFollower.tsx  # teal cursor ring (pointer devices only)
+│   │   ├── IntroBanner.tsx     # per-page dismissable banner
+│   │   ├── ImageDropzone.tsx   # shared drag-and-drop / click-to-browse upload
+│   │   ├── AboutView.tsx       # overview, how it works, stored schema
+│   │   ├── AnchorView.tsx      # anchor an AI-generated image
+│   │   ├── SocialView.tsx      # X-style feed with provenance badges
+│   │   ├── ProvenanceDrawer.tsx# provenance record viewer
+│   │   ├── Icon.tsx, Row.tsx   # small shared pieces
+│   ├── lib/
+│   │   ├── originaClient.ts    # backend integration point (see below)
+│   │   ├── hash.ts             # SHA-256, 64-bit pHash, Hamming distance
+│   │   ├── imageMeta.ts        # image format/dimension reader (display only)
+│   │   ├── feed.ts             # sample feed posts
+│   │   ├── models.ts           # AI model list
+│   │   ├── format.ts           # formatting helpers
+│   │   └── storage.ts          # safe localStorage helpers
+│   └── styles/globals.css      # all styling (CSS variables, no framework)
 ├── package.json                # root, pnpm workspaces
 └── pnpm-workspace.yaml
 ```
 
 ## Quick start
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) ≥ 18
-- [pnpm](https://pnpm.io/installation) ≥ 9
-
-### Install and run
+Prerequisites: [Node.js](https://nodejs.org/) ≥ 18 and [pnpm](https://pnpm.io/installation) ≥ 9.
 
 ```bash
 pnpm install
 pnpm dev:app     # http://localhost:3000
+pnpm build       # production build
 ```
 
-## How the demo works
+## What the app does
 
-The page has two panels, side by side:
+- **About** — what Origina is, how it works, and the record schema.
+- **Anchor** — drop an AI-generated image, choose the model that made it, and anchor its fingerprint. The image is fingerprinted in the browser (SHA-256 for exact matching, a 64-bit perceptual hash for near matching) and never uploaded. Anchoring the same file twice returns the original record, since anchors are immutable.
+- **Social** — an X-style feed. Upload an image under "Add to feed" and it is checked against anchored records: an exact SHA-256 match earns an **AI-generated** badge, a perceptual-hash match within Hamming distance 12 earns **AI-generated · modified**, and no match gets no badge. Click a badge to open the provenance record.
 
-- **AI Tool — Creator** (left): drag and drop an AI-generated image, pick the model that made it, type a wallet address, and click **Anchor**.
-- **Platform — e.g. TikTok / Instagram** (right): drag and drop any image to check it against anchored records — exact match, near match (lightly edited), or not found.
-
-Both panels call into `OriginaClient` (see below) for the actual anchor/verify work; image format and dimensions shown in the UI are read locally via `app/lib/imageMeta.ts` regardless of backend status.
+A wallet address can be entered from the nav to label records with a creator; direct wallet-adapter connections (Phantom, Backpack) are planned. Nothing is signed or sent from the wallet.
 
 ## Backend integration
 
-`app/lib/originaClient.ts` is the one file this demo app depends on for all backend behavior — fingerprint hashing, calling the API, and reading on-chain state. Right now its `OriginaClient.anchor()` and `.verify()` methods are placeholders that throw a clear "not connected yet" error (surfaced through the UI's existing error states), matching this contract:
+`app/lib/originaClient.ts` is the single seam between the UI and the backend, and the UI imports nothing else backend-related. To connect the real backend, replace the bodies of `anchor()` and `verify()` (or the whole file) with calls into the SDK/API, keeping this contract so no other app code changes:
 
 ```ts
 class OriginaClient {
   constructor(options?: { apiBaseUrl?: string; cluster?: string });
+
   anchor(params: {
     fileData: Uint8Array;
     modelId: string;
     mediaType: "image" | "video" | "audio" | "text";
     walletPublicKey: string;
-    metadataUri?: string;
   }): Promise<{
-    signature: string;
-    pdaAddress: string;
+    modelId: string;
+    creator: string;
     sha256: string;
-    phash: string;
-    timestamp: number;
-    slot: number;
-    explorerUrl: string;
-    width: number | null;
-    height: number | null;
-    format: string;
+    phash: string;              // 0x-prefixed hex
+    timestamp: number;          // unix seconds
+    slot: number | null;        // chain-derived; null until the on-chain program is connected
+    pdaAddress: string | null;
+    explorerUrl: string | null;
+    alreadyAnchored?: boolean;  // true if this file was anchored before (existing record returned)
   }>;
+
   verify(params: { fileData: Uint8Array }): Promise<{
     found: boolean;
     exactMatch: boolean;
     nearMatch: boolean;
-    creator: string | null;
+    pHashDistance: number | null; // 0 for exact, Hamming distance for near, null if no match
     modelId: string | null;
-    mediaType: "image" | "video" | "audio" | "text" | null;
+    creator: string | null;
+    sha256: string | null;
     timestamp: number | null;
+    slot: number | null;
     pdaAddress: string | null;
     explorerUrl: string | null;
-    pHashDistance: number | null;
-    width: number | null;
-    height: number | null;
-    format: string | null;
   }>;
 }
 ```
 
-To wire in the real backend once it's ready: either replace the internals of `OriginaClient` in `app/lib/originaClient.ts` with real SDK/API calls, or swap the whole file for the SDK package the other contributor supplies (as long as it exports something matching this shape, no other app code needs to change).
+The chain-derived fields (`slot`, `pdaAddress`, `explorerUrl`) are optional in the UI: when the backend returns them they are shown (including a "View on Solana Explorer" link), and when they are `null` they are simply omitted. The stand-in client in this repo returns `null` for all three, because it does not talk to Solana.
+
+**Perceptual hash note:** `computePHash` in `app/lib/hash.ts` samples raw file bytes rather than decoded pixels, so how reliably a crop or re-save registers as a near match depends on the file format. A production implementation should use a pixel-domain perceptual hash.
 
 ## License
 

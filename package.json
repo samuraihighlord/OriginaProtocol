@@ -2,7 +2,7 @@
   "name": "origina-protocol",
   "version": "0.1.0",
   "private": true,
-  "description": "Origina Protocol demo app. Backend/SDK/blockchain integration is supplied separately — see README.",
+  "description": "Origina Protocol — AI media provenance on Solana. Backend, SDK, and on-chain integration plug in through app/lib/originaClient.ts — see README.",
   "license": "MIT",
   "scripts": {
     "build": "pnpm --filter @origina/app build",
