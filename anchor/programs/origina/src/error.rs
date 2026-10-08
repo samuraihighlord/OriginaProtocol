@@ -1,0 +1,29 @@
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum RegistryError {
+    #[msg("Invalid Authority")]
+    InvalidAuthority,
+    #[msg("Invalid Program Data")]
+    InvalidProgramData,
+    #[msg("Unauthorized")]
+    Unauthorized,
+    #[msg("No Pending Authority")]
+    NoPendingAuthority,
+    #[msg("Invalid Name")]
+    InvalidName,
+    #[msg("Invalid Provider")]
+    InvalidProvider,
+    #[msg("Invalid Cert Identity")]
+    InvalidCertIdentity,
+    #[msg("Invalid Refund Account")]
+    InvalidRefundAccount,
+    #[msg("Provider Revoked")]
+    ProviderRevoked,
+    #[msg("Invalid Revocation Reason")]
+    InvalidRevocationReason,
+    #[msg("Invalid Hash")]
+    InvalidHash,
+    #[msg("Invalid Creator")]
+    InvalidCreator,
+}
