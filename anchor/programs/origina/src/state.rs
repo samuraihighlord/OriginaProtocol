@@ -40,6 +40,7 @@ pub struct ProvenanceRecord {
     pub file_sha256: [u8; 32],
     pub perceptual: Option<PerceptualHash>,
     pub c2pa_manifest_hash: [u8; 32],
+    pub creator_wallet: Option<Pubkey>,
     pub slot: u64,
     pub generated_at: Option<i64>,
     pub bump: u8,

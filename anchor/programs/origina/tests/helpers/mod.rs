@@ -68,6 +68,30 @@ impl TestConfig {
         result
     }
 
+    pub fn send_with_signers(
+        svm: &mut LiteSVM,
+        ix: Instruction,
+        signers: &[&Keypair],
+        label: &str,
+    ) -> TransactionResult {
+        let message = Message::new(&[ix], Some(&signers[0].pubkey()));
+        let tx = Transaction::new(signers, message, svm.latest_blockhash());
+        let result = svm.send_transaction(tx);
+        match &result {
+            Ok(meta) => println!(
+                "{}\n{label} succeeded | CUs: {}",
+                meta.pretty_logs(),
+                meta.compute_units_consumed
+            ),
+            Err(failed) => println!(
+                "{}\n{label} failed | error: {:?}",
+                failed.meta.pretty_logs(),
+                failed.err
+            ),
+        }
+        result
+    }
+
     pub fn init_registry(&mut self) -> TransactionResult {
         let ix = Instruction {
             program_id: PROGRAM_ID,
@@ -232,21 +256,22 @@ impl TestConfig {
         Self::send(&mut self.program, ix, provider, "self_revoke_provider")
     }
 
-    pub fn anchor_media(
-        &mut self,
-        provider: &Keypair,
+    pub fn anchor_media_ix(
+        &self,
+        provider: Pubkey,
+        creator: Option<Pubkey>,
         file_sha256: [u8; 32],
         perceptual: Option<PerceptualHash>,
         c2pa_manifest_hash: [u8; 32],
         generated_at: Option<i64>,
-    ) -> TransactionResult {
-        let key = provider.pubkey();
-        let ix = Instruction {
+    ) -> Instruction {
+        Instruction {
             program_id: PROGRAM_ID,
             accounts: origina::accounts::AnchorMedia {
-                provider: key,
-                provider_account: provider_pda(&key),
-                provenance_record: media_pda(&key, &file_sha256),
+                provider,
+                creator,
+                provider_account: provider_pda(&provider),
+                provenance_record: media_pda(&provider, &file_sha256),
                 system_program: self.system_program,
                 event_authority: self.event_authority,
                 program: PROGRAM_ID,
@@ -259,8 +284,51 @@ impl TestConfig {
                 generated_at,
             }
             .data(),
-        };
-        Self::send(&mut self.program, ix, provider, "anchor_media")
+        }
+    }
+
+    pub fn anchor_media_with_creator(
+        &mut self,
+        provider: &Keypair,
+        creator: Option<&Keypair>,
+        file_sha256: [u8; 32],
+        perceptual: Option<PerceptualHash>,
+        c2pa_manifest_hash: [u8; 32],
+        generated_at: Option<i64>,
+    ) -> TransactionResult {
+        let ix = self.anchor_media_ix(
+            provider.pubkey(),
+            creator.map(|c| c.pubkey()),
+            file_sha256,
+            perceptual,
+            c2pa_manifest_hash,
+            generated_at,
+        );
+        let mut signers = vec![provider];
+        if let Some(c) = creator {
+            if c.pubkey() != provider.pubkey() {
+                signers.push(c);
+            }
+        }
+        Self::send_with_signers(&mut self.program, ix, &signers, "anchor_media")
+    }
+
+    pub fn anchor_media(
+        &mut self,
+        provider: &Keypair,
+        file_sha256: [u8; 32],
+        perceptual: Option<PerceptualHash>,
+        c2pa_manifest_hash: [u8; 32],
+        generated_at: Option<i64>,
+    ) -> TransactionResult {
+        self.anchor_media_with_creator(
+            provider,
+            None,
+            file_sha256,
+            perceptual,
+            c2pa_manifest_hash,
+            generated_at,
+        )
     }
 
     fn read<T: AccountDeserialize>(&self, address: &Pubkey) -> Option<T> {

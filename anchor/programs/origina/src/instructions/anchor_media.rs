@@ -9,6 +9,7 @@ pub struct MediaAnchored {
     pub file_sha256: [u8; 32],
     pub c2pa_manifest_hash: [u8; 32],
     pub perceptual: Option<PerceptualHash>,
+    pub creator_wallet: Option<Pubkey>,
     pub slot: u64,
     pub generated_at: Option<i64>,
 }
@@ -19,6 +20,7 @@ pub struct MediaAnchored {
 pub struct AnchorMedia<'info> {
     #[account(mut)]
     pub provider: Signer<'info>,
+    pub creator: Option<Signer<'info>>,
     #[account(
         seeds = [b"provider", provider.key().as_ref()],
         bump = provider_account.bump,
@@ -55,11 +57,20 @@ impl<'info> AnchorMedia<'info> {
 
         let slot = Clock::get()?.slot;
         let provider = self.provider.key();
+        let creator_wallet = match &self.creator {
+            Some(c) => Some(c.key()),
+            None => None,
+        };
+        require!(
+            creator_wallet != Some(provider),
+            RegistryError::InvalidCreator
+        );
 
         self.provenance_record.set_inner(ProvenanceRecord {
             provider,
             file_sha256,
             c2pa_manifest_hash,
+            creator_wallet,
             slot,
             bump: bumps.provenance_record,
             perceptual,
@@ -72,6 +83,7 @@ impl<'info> AnchorMedia<'info> {
             file_sha256,
             c2pa_manifest_hash,
             perceptual,
+            creator_wallet,
             slot,
             generated_at,
         })

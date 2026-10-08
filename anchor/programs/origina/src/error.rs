@@ -24,4 +24,6 @@ pub enum RegistryError {
     InvalidRevocationReason,
     #[msg("Invalid Hash")]
     InvalidHash,
+    #[msg("Invalid Creator")]
+    InvalidCreator,
 }

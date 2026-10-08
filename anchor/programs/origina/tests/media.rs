@@ -39,6 +39,7 @@ fn anchor_creates_record_with_and_without_optional_fields() {
     assert_eq!(record.c2pa_manifest_hash, MANIFEST);
     assert_eq!(record.perceptual, Some(perceptual()));
     assert_eq!(record.generated_at, Some(GENERATED_AT));
+    assert!(record.creator_wallet.is_none());
 
     t.anchor_media(&provider, hash(2), None, MANIFEST, None)
         .unwrap();
@@ -46,6 +47,7 @@ fn anchor_creates_record_with_and_without_optional_fields() {
     assert_eq!(record.file_sha256, hash(2));
     assert!(record.perceptual.is_none());
     assert!(record.generated_at.is_none());
+    assert!(record.creator_wallet.is_none());
 }
 
 #[test]
@@ -109,5 +111,57 @@ fn anchor_by_unregistered_provider_fails() {
     let unregistered = funded_keypair(&mut t);
     assert!(t
         .anchor_media(&unregistered, hash(1), None, MANIFEST, None)
+        .is_err());
+}
+
+#[test]
+fn anchor_with_cosigning_creator_stores_wallet() {
+    let mut t = setup_initialized();
+    let provider = register_provider(&mut t);
+    let creator = funded_keypair(&mut t);
+
+    t.anchor_media_with_creator(&provider, Some(&creator), hash(1), None, MANIFEST, None)
+        .unwrap();
+    let record = t
+        .provenance_record(&provider.pubkey(), &hash(1))
+        .expect("record missing");
+    assert_eq!(record.creator_wallet, Some(creator.pubkey()));
+}
+
+#[test]
+fn anchor_with_unsigned_creator_fails() {
+    let mut t = setup_initialized();
+    let provider = register_provider(&mut t);
+    let creator = funded_keypair(&mut t);
+
+    let mut ix = t.anchor_media_ix(
+        provider.pubkey(),
+        Some(creator.pubkey()),
+        hash(1),
+        None,
+        MANIFEST,
+        None,
+    );
+    for meta in ix.accounts.iter_mut() {
+        if meta.pubkey == creator.pubkey() {
+            meta.is_signer = false;
+        }
+    }
+    assert!(TestConfig::send(
+        &mut t.program,
+        ix,
+        &provider,
+        "anchor_media_unsigned_creator"
+    )
+    .is_err());
+}
+
+#[test]
+fn anchor_with_provider_as_creator_fails() {
+    let mut t = setup_initialized();
+    let provider = register_provider(&mut t);
+
+    assert!(t
+        .anchor_media_with_creator(&provider, Some(&provider), hash(1), None, MANIFEST, None)
         .is_err());
 }

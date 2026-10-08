@@ -2,7 +2,7 @@
 
 Origina is an on-chain registry for AI-generated image provenance on Solana.
 
-Approved providers anchor records of each generated image on-chain with a SHA-256 of its file bytes, an optional perceptual hash, and a hash of its C2PA manifest. Anyone can look the file up on-chain, and see when it was anchored and by which provider. **No media is stored on chain.**
+Approved providers anchor records of each generated image on-chain with a SHA-256 of its file bytes, an optional perceptual hash, and a hash of its C2PA manifest. A record links to a creator wallet if that wallet signs the anchor transaction. Anyone can look the file up on-chain, and see when it was anchored and by which provider. **No media is stored on chain.**
 
 ## Contents
 
@@ -16,7 +16,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 ## How it works
 1. The registry authority approves providers after verifying their C2PA signing certificate off-chain.
 2. An approved provider claims its registration by signing with its own key.
-3. The provider anchors media at the point of generation. One on-chain record per file.
+3. The provider anchors media at the point of generation. One on-chain record per file. A creator wallet is attached if that wallet also signs the transaction.
 4. To verify, the record address of a hashed file is derived and fetched.
 5. Providers can be revoked by the authority or by themselves. Revocation is permanent. The revocation record remains.
 
@@ -41,12 +41,15 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 | `claim_provider`            | Provider                  | Creates the provider account from the approval. Closes the approval account. |
 | `revoke_provider`           | Registry authority        | Revokes the provider account with `Policy` or `KeyCompromised`.              |
 | `self_revoke_provider`      | Provider                  | Revokes the provider account with `Voluntary` or `KeyCompromised`.           |
-| `anchor_media`              | Provider                  | Creates a provenance record.                                                 |
+| `anchor_media`              | Provider   (+ optional creator)               | Creates a provenance record. A co-signing creator's wallet is stored on the record.                                                |
 
 Every instruction emits an event. `anchor_media` uses CPI events (`emit_cpi!`), which are stored in instruction data to prevent data loss from log-based events.
 
 ## Revocation model
 Revocation **never rewrites history**. Records are never deleted or modified. Verifiers can compare a record's `slot` to the provider's `revocation.slot`. Records anchored before the revocation remain valid, except under `KeyCompromised`, where records shortly before it may be fraudulent. Records in the same slot as the revocation should be treated as suspect. No records can be anchored after revocation.
+
+## Creator wallet
+`creator_wallet` is optional and only set when the creator **signs** the `anchor_media` transaction. A provider cannot attach a wallet without its owner's signature, and cannot name itself as creator. As the records are permanent, it should be disclosed by providers to users before they sign that their wallet will be publicly linked to the media.
 
 ## Build, Test and Deploy
 **Prerequisites**: Rust 1.89.0, Solana CLI, Anchor CLI 1.0.2.
