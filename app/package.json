@@ -6,18 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate:client": "node scripts/generate-client.mjs",
+    "setup:local": "tsx scripts/local-setup.ts",
+    "test:chain": "tsx scripts/chain-integration.ts"
   },
   "dependencies": {
+    "@solana/kit": "^8.4.0",
+    "@solana/kit-plugin-rpc": "^0.19.0",
+    "@solana/kit-plugin-wallet": "^0.21.0",
+    "@solana/program-client-core": "^8.4.0",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3"
   },
   "devDependencies": {
+    "@codama/nodes-from-anchor": "^1.5.6",
+    "@codama/renderers-js": "^2.5.0",
+    "@solana/kit-plugin-signer": "^0.19.0",
     "@types/node": "^20.14.9",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "codama": "^1.11.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.3"
   }
 }

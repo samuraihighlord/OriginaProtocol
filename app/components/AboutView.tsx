@@ -1,19 +1,18 @@
 const HOW_IT_WORKS = [
-  { title: "Generate", text: "An AI tool creates the media." },
+  { title: "Generate", text: "An approved AI provider creates the media." },
   { title: "Fingerprint", text: "SHA-256 and pHash are computed locally — the file never leaves the device." },
-  { title: "Anchor", text: "About 114 bytes are written to Solana permanently." },
-  { title: "Verify", text: "Any platform checks origin in under 200ms." },
+  { title: "Anchor", text: "A 189-byte record is written to Solana permanently." },
+  { title: "Verify", text: "Any platform checks origin with a single on-chain lookup." },
 ];
 
 const SCHEMA: { field: string; description: string; optional?: boolean }[] = [
-  { field: "creator", description: "Wallet address of the creator" },
-  { field: "sha256_hash", description: "Exact-match fingerprint of the file" },
-  { field: "phash", description: "Perceptual hash for near-match detection" },
-  { field: "model_id", description: "The AI model that generated the media" },
-  { field: "media_type", description: "Image, video, audio, or text" },
-  { field: "timestamp", description: "Unix time of the anchor" },
+  { field: "provider", description: "The approved provider wallet that anchored the record" },
+  { field: "file_sha256", description: "Exact-match fingerprint of the file" },
+  { field: "perceptual", description: "Perceptual hash (algorithm + hash) for near-match detection", optional: true },
+  { field: "c2pa_manifest_hash", description: "Hash of the file's C2PA manifest" },
+  { field: "creator_wallet", description: "The creator's wallet, if they co-signed the anchor", optional: true },
   { field: "slot", description: "Solana slot that confirmed the record" },
-  { field: "parent", description: "Parent record, for edit chains", optional: true },
+  { field: "generated_at", description: "When the provider says the media was generated", optional: true },
 ];
 
 export function AboutView() {
@@ -23,12 +22,12 @@ export function AboutView() {
         <h1>The trust layer for AI-generated media.</h1>
         <p>
           Origina anchors a cryptographic fingerprint of any AI-generated image, video, or audio on
-          Solana at the moment of creation. Any platform can verify origin, model, and authenticity
-          in under 200ms — without storing the file.
+          Solana at the moment of creation. Any platform can verify origin, provider, and authenticity
+          with a single on-chain lookup — without storing the file.
         </p>
         <div className="stat-pills">
-          <span className="pill">{"< $0.001 per anchor"}</span>
-          <span className="pill">~400ms finality</span>
+          <span className="pill">~0.002 SOL per anchor</span>
+          <span className="pill">~400ms slot time</span>
           <span className="pill">MIT open-source</span>
         </div>
       </div>
@@ -48,22 +47,23 @@ export function AboutView() {
       <div className="glass card">
         <ul className="tips-list">
           <li>
-            <strong>Anchor an image.</strong> Drop an AI-generated image on the Anchor page, choose the
-            model that made it, and anchor its fingerprint. Connect a wallet address in the top right
-            to label the record with your own creator address.
+            <strong>Connect a provider wallet.</strong> Only providers approved by the Origina registry can
+            anchor. Connect a wallet in the top right; if it&apos;s been approved, claim your registration once
+            and you&apos;re ready.
           </li>
           <li>
-            <strong>Check it on a platform.</strong> On the Social page, upload the same image under
-            &quot;Add to feed&quot;. A match earns an Origina badge — click it to open the record.
+            <strong>Anchor an image.</strong> Drop an AI-generated image on the Anchor page and anchor its
+            fingerprint. You pay a one-time rent deposit of about 0.002 SOL plus a tiny network fee.
           </li>
           <li>
-            <strong>Try an edited copy.</strong> Crop or recompress the image and upload that version
-            to see a near match instead of an exact one. The MVP&apos;s perceptual hash works on raw
-            file data rather than decoded pixels, so it is most reliable for small edits.
+            <strong>Check it on a platform.</strong> On the Social page, upload an image under &quot;Add to
+            feed&quot;. It&apos;s checked against the on-chain records — no wallet required. A match earns an
+            Origina badge; click it to open the record.
           </li>
           <li>
-            <strong>Where records live.</strong> Solana anchoring is still being connected. In this
-            MVP, records are held in your browser session and reset when you refresh.
+            <strong>Try an edited copy.</strong> Crop or recompress an anchored image and upload that version to
+            see a near match instead of an exact one. The MVP&apos;s perceptual hash works on raw file data
+            rather than decoded pixels, so it is most reliable for small edits.
           </li>
         </ul>
       </div>
@@ -82,8 +82,8 @@ export function AboutView() {
           ))}
         </div>
         <div className="schema-total">
-          <span>Total: approximately 114 bytes</span>
-          <span>Cost: less than $0.001</span>
+          <span>Total: 189 bytes per record</span>
+          <span>One-time rent: about 0.0022 SOL</span>
         </div>
       </div>
 

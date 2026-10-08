@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { truncateAddress, truncateHash } from "../lib/format";
 import type { Provenance } from "../lib/feed";
-import { modelLabel } from "../lib/models";
 import { Row } from "./Row";
 
 export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenance; onClose: () => void }) {
@@ -29,17 +28,28 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
             </button>
           </div>
 
-          <Row label="Model" mono={false}>
-            {modelLabel(provenance.modelId)}
+          <Row label="Provider" mono={false}>
+            {provenance.providerName ?? "Unnamed provider"}
           </Row>
-          <Row label="Creator">
-            <span title={provenance.creator}>{truncateAddress(provenance.creator, 6, 6)}</span>
+          <Row label="Provider wallet">
+            <span title={provenance.provider}>{truncateAddress(provenance.provider, 6, 6)}</span>
           </Row>
-          <Row label="Anchored" mono={false}>
-            {new Date(provenance.timestamp * 1000).toLocaleString()}
-          </Row>
-          {provenance.slot != null && <Row label="Solana slot">{provenance.slot}</Row>}
-          {provenance.pdaAddress && <Row label="PDA address">{provenance.pdaAddress}</Row>}
+          {provenance.creatorWallet && (
+            <Row label="Creator wallet">
+              <span title={provenance.creatorWallet}>{truncateAddress(provenance.creatorWallet, 6, 6)}</span>
+            </Row>
+          )}
+          {provenance.timestamp !== null && (
+            <Row label="Anchored" mono={false}>
+              {new Date(provenance.timestamp * 1000).toLocaleString()}
+            </Row>
+          )}
+          {provenance.slot !== null && <Row label="Solana slot">{provenance.slot}</Row>}
+          {provenance.recordAddress && (
+            <Row label="Record">
+              <span title={provenance.recordAddress}>{truncateAddress(provenance.recordAddress, 6, 6)}</span>
+            </Row>
+          )}
           <Row label="SHA-256">
             <span title={provenance.sha256}>{truncateHash(provenance.sha256)}</span>
           </Row>
@@ -58,16 +68,18 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
             </Row>
           )}
 
-          {provenance.explorerUrl && (
+          {provenance.recordUrl && (
             <div style={{ marginTop: 14 }}>
-              <a href={provenance.explorerUrl} target="_blank" rel="noopener noreferrer">
-                View transaction on Solana Explorer ↗
+              <a href={provenance.recordUrl} target="_blank" rel="noopener noreferrer">
+                View record on Solana Explorer ↗
               </a>
             </div>
           )}
-          <div className="status-note" style={{ marginTop: 14 }}>
-            On-chain verification is still being connected, so this record is not yet anchored on Solana.
-          </div>
+          {provenance.sample && (
+            <div className="status-note" style={{ marginTop: 14 }}>
+              This is a sample post with illustrative data — it is not a record on Solana.
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import { NavBar, type View } from "../components/NavBar";
 import { SocialView } from "../components/SocialView";
 import { Toast, type ToastData } from "../components/Toast";
 import { WelcomeModal } from "../components/WelcomeModal";
-import { OriginaClient } from "../lib/originaClient";
+import { useChain } from "../lib/chain/useChain";
 import { lsGet, lsSet } from "../lib/storage";
 
 const MODAL_KEY = "origina_modal_v2";
@@ -19,28 +19,28 @@ type BannerPage = "anchor" | "social";
 const BANNERS: Record<BannerPage, JSX.Element> = {
   anchor: (
     <>
-      <strong>What anchoring does.</strong> It stamps your AI-generated image with a verifiable
-      fingerprint. Your file stays on your device — only the fingerprint is recorded, so anyone can
-      later check where the image came from without Origina ever holding it.
+      <strong>What anchoring does.</strong> It writes a verifiable fingerprint of your AI-generated image
+      to Solana. Your file stays on your device — only the fingerprint goes on-chain, so anyone can later
+      check where the image came from without Origina ever holding it. Only providers approved by the
+      Origina registry can anchor.
     </>
   ),
   social: (
     <>
       <strong>Platform view.</strong> Posts carrying an Origina badge have a provenance record — click
-      the badge to inspect it. To check your own image, anchor it on the Anchor page, then upload it
-      under &quot;Add to feed&quot; below and watch it pick up its badge.
+      the badge to inspect it. To check your own image, upload it under &quot;Add to feed&quot; below; it
+      is looked up on-chain, no wallet needed.
     </>
   ),
 };
 
 export default function Home() {
   const [view, setView] = useState<View>("about");
-  const [wallet, setWallet] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   // null until localStorage has been read on the client, so nothing flashes during hydration
   const [dismissed, setDismissed] = useState<Record<BannerPage, boolean> | null>(null);
   const [toast, setToast] = useState<ToastData | null>(null);
-  const [client] = useState(() => new OriginaClient());
+  const chain = useChain();
   const toastId = useRef(0);
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function Home() {
       <div className="orb orb-blue" />
       <CursorFollower />
 
-      <NavBar view={view} onChange={changeView} wallet={wallet} onWalletChange={setWallet} />
+      <NavBar view={view} onChange={changeView} chain={chain} />
       {modalOpen && <WelcomeModal onClose={closeModal} />}
       <Toast toast={toast} onAction={changeView} onDone={clearToast} />
 
@@ -98,11 +98,11 @@ export default function Home() {
         </section>
         <section className="page" hidden={view !== "anchor"}>
           {banner("anchor")}
-          <AnchorView client={client} wallet={wallet} onGoSocial={() => changeView("social")} />
+          <AnchorView client={chain.client} chain={chain} onGoSocial={() => changeView("social")} />
         </section>
         <section className="page" hidden={view !== "social"}>
           {banner("social")}
-          <SocialView client={client} onToast={showToast} />
+          <SocialView client={chain.client} onToast={showToast} />
         </section>
       </main>
     </>

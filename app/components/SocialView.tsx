@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { describeChainError } from "../lib/chain/errors";
 import { describeFile } from "../lib/format";
 import { FEED_POSTS, type FeedPost } from "../lib/feed";
 import type { OriginaClient } from "../lib/originaClient";
@@ -162,13 +163,14 @@ export function SocialView({
         replies: 0,
         provenance: match.found
           ? {
-              modelId: match.modelId ?? "custom",
-              creator: match.creator ?? "",
+              providerName: match.providerName,
+              provider: match.provider ?? "",
               sha256: match.sha256 ?? "",
-              timestamp: match.timestamp ?? 0,
+              creatorWallet: match.creatorWallet,
               slot: match.slot,
-              pdaAddress: match.pdaAddress,
-              explorerUrl: match.explorerUrl,
+              timestamp: match.timestamp,
+              recordAddress: match.recordAddress,
+              recordUrl: match.recordUrl,
               matchType: match.exactMatch ? "exact" : "near",
               distance: match.pHashDistance ?? undefined,
             }
@@ -185,14 +187,14 @@ export function SocialView({
       setTimeout(() => feedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
       onToast(
         match.exactMatch
-          ? "Exact match — this image carries an Origina record."
+          ? "Exact match — this image has an Origina record on Solana."
           : match.nearMatch
           ? "Near match — this looks like a modified anchored image."
-          : "No Origina record found for this image.",
+          : "No Origina record found on-chain for this image.",
         3500
       );
     } catch (err) {
-      setError(`Could not verify this file: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`Could not verify this file: ${describeChainError(err)}`);
     } finally {
       setPosting(false);
     }
@@ -248,7 +250,7 @@ export function SocialView({
         onAnimationEnd={() => setFlash(false)}
       >
         <h2>Add to feed</h2>
-        <p className="sub">Post an image and it&apos;s checked against anchored records — a match earns the Origina badge.</p>
+        <p className="sub">Post an image and it&apos;s checked against the on-chain Origina records — a match earns the badge. No wallet needed.</p>
         <ImageDropzone title="Drop an image here" preview={preview} onFile={handleFile} onError={setError} />
         {bytes && <div className="file-meta">{fileLabel}</div>}
         {error && <div className="error-text">{error}</div>}

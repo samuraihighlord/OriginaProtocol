@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { CLUSTER } from "../lib/chain/config";
+import type { ChainState } from "../lib/chain/useChain";
 import { truncateAddress } from "../lib/format";
 import { Icon, type IconName } from "./Icon";
+import { ProviderPanel, WalletList } from "./WalletPanels";
 
 export type View = "about" | "anchor" | "social";
 
@@ -10,13 +13,10 @@ const TABS: { view: View; label: string; icon: IconName }[] = [
   { view: "social", label: "Social", icon: "chat" },
 ];
 
-const SOL_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-
-function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w: string | null) => void }) {
+function WalletMenu({ chain }: { chain: ChainState }) {
   const [open, setOpen] = useState(false);
-  const [input, setInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const { address, connectedWalletName, status, provider, disconnect, walletError } = chain;
 
   useEffect(() => {
     if (!open) return;
@@ -34,23 +34,7 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
     };
   }, [open]);
 
-  function toggle() {
-    if (!open) {
-      setInput(wallet ?? "");
-      setError(null);
-    }
-    setOpen((o) => !o);
-  }
-
-  function confirm() {
-    const value = input.trim();
-    if (!SOL_ADDRESS.test(value)) {
-      setError("That doesn't look like a valid Solana address (32–44 base58 characters).");
-      return;
-    }
-    onChange(value);
-    setOpen(false);
-  }
+  const dotClass = provider.phase === "ready" && provider.status.kind === "active" ? "dot" : "dot warn";
 
   return (
     <div className="nav-right" ref={ref}>
@@ -60,62 +44,55 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
         id="wallet-btn"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={toggle}
+        onClick={() => setOpen((o) => !o)}
       >
-        {wallet ? (
+        {address ? (
           <>
-            <span className="dot" />
-            <span className="mono">{truncateAddress(wallet, 8, 4)}</span>
+            <span className={dotClass} />
+            <span className="mono">{truncateAddress(address, 4, 4)}</span>
           </>
         ) : (
           <>
             <Icon name="wallet" />
-            <span>Connect wallet</span>
+            <span>{status === "connecting" ? "Connecting…" : "Connect wallet"}</span>
           </>
         )}
       </button>
 
       {open && (
-        <div className="popover" role="dialog" aria-label="Connect wallet">
-          <p>
-            Paste a Solana address to act as the creator on your records. Direct wallet connections
-            (Phantom, Backpack) are coming.
-          </p>
-          <label className="field-label" htmlFor="wallet-input">
-            Solana address
-          </label>
-          <input
-            type="text"
-            id="wallet-input"
-            className="mono"
-            placeholder="7xKXqx6Rr8jV7XX9RwtwxWFsn1eScqz9jyqLTQjbxYES"
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && confirm()}
-          />
-          {error && <div className="error-text">{error}</div>}
-          <div className="row" style={{ marginTop: 12 }}>
-            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={confirm}>
-              {wallet ? "Update address" : "Confirm"}
-            </button>
-            {wallet && (
-              <button
-                type="button"
-                className="btn btn-subtle"
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-              >
-                Disconnect
-              </button>
-            )}
-          </div>
+        <div className="popover" role="dialog" aria-label="Wallet">
+          {address ? (
+            <>
+              <p className="addr">
+                <strong style={{ color: "#fff" }}>{connectedWalletName}</strong>
+                <br />
+                <span className="mono">{address}</span>
+              </p>
+              <ProviderPanel chain={chain} />
+              {walletError && <div className="error-text">{walletError}</div>}
+              <div className="row" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-subtle"
+                  style={{ flex: 1 }}
+                  onClick={async () => {
+                    await disconnect();
+                    setOpen(false);
+                  }}
+                >
+                  Disconnect
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>Connect a Solana wallet to anchor images. Checking an image never needs a wallet.</p>
+              <WalletList chain={chain} />
+              {walletError && <div className="error-text">{walletError}</div>}
+            </>
+          )}
           <p className="note">
-            Your address only labels your records. Nothing is signed or sent from your wallet.
+            Network: Solana {CLUSTER}. Nothing is signed until you press Anchor and approve it in your wallet.
           </p>
         </div>
       )}
@@ -126,11 +103,10 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
 interface NavBarProps {
   view: View;
   onChange: (view: View) => void;
-  wallet: string | null;
-  onWalletChange: (wallet: string | null) => void;
+  chain: ChainState;
 }
 
-export function NavBar({ view, onChange, wallet, onWalletChange }: NavBarProps) {
+export function NavBar({ view, onChange, chain }: NavBarProps) {
   return (
     <>
       <header className="topnav">
@@ -156,7 +132,7 @@ export function NavBar({ view, onChange, wallet, onWalletChange }: NavBarProps) 
           ))}
         </nav>
 
-        <WalletMenu wallet={wallet} onChange={onWalletChange} />
+        <WalletMenu chain={chain} />
       </header>
 
       <nav className="bottom-tabs" aria-label="Pages (mobile)">

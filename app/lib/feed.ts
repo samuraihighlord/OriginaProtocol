@@ -1,13 +1,17 @@
 export interface Provenance {
-  modelId: string;
-  creator: string;
+  providerName: string | null;
+  provider: string;
   sha256: string;
-  timestamp: number;
-  slot?: number | null;
-  pdaAddress?: string | null;
-  explorerUrl?: string | null;
+  creatorWallet: string | null;
+  slot: number | null;
+  /** Unix seconds; null when unknown. */
+  timestamp: number | null;
+  recordAddress: string | null;
+  recordUrl: string | null;
   matchType?: "exact" | "near";
   distance?: number;
+  /** True for the seeded sample posts: illustrative content, not a real on-chain record. */
+  sample?: boolean;
 }
 
 export interface FeedPost {
@@ -40,8 +44,18 @@ function fakeHex(seed: number, len = 64): string {
 
 const NOW = Math.floor(Date.now() / 1000);
 
-function prov(seed: number, modelId: string, creator: string, hoursAgo: number): Provenance {
-  return { modelId, creator, sha256: fakeHex(seed), timestamp: NOW - Math.floor(hoursAgo * 3600) };
+function prov(seed: number, providerName: string, provider: string, hoursAgo: number): Provenance {
+  return {
+    providerName,
+    provider,
+    sha256: fakeHex(seed),
+    creatorWallet: null,
+    slot: null,
+    timestamp: NOW - Math.floor(hoursAgo * 3600),
+    recordAddress: null,
+    recordUrl: null,
+    sample: true,
+  };
 }
 
 const W1 = "4Nd1mYQq3FpkWf3Z6hKs8Vt2xRjB9cLuAeDoGvH7TyPq";
@@ -57,13 +71,13 @@ export const FEED_POSTS: FeedPost[] = (
       id: "p1", name: "Maya Chen", handle: "@maya.creates", time: "14m", avatar: "#1D9E75", following: true,
       text: "Neon harbour at midnight. Took about forty prompt iterations to get the reflections right.",
       media: "radial-gradient(circle at 25% 30%, #ff5fa2 0%, transparent 45%), radial-gradient(circle at 80% 70%, #22d3ee 0%, transparent 50%), linear-gradient(135deg, #1e1b4b, #0f172a)",
-      likes: 214, reposts: 38, replies: 12, provenance: prov(101, "midjourney-v6", W1, 0.2),
+      likes: 214, reposts: 38, replies: 12, provenance: prov(101, "Midjourney", W1, 0.2),
     },
     {
       id: "p2", name: "Jonah Reyes", handle: "@jonah_k", time: "2h", avatar: "#7c3aed", following: false,
       text: "Golden hour on a planet that doesn't exist yet.",
       media: "radial-gradient(circle at 70% 25%, #fde68a 0%, transparent 40%), radial-gradient(circle at 20% 80%, #f97316 0%, transparent 50%), linear-gradient(160deg, #7c2d12, #1c1917)",
-      likes: 482, reposts: 91, replies: 27, provenance: prov(202, "flux-1", W2, 2),
+      likes: 482, reposts: 91, replies: 27, provenance: prov(202, "Flux", W2, 2),
     },
     {
       id: "p3", name: "Lena Okafor", handle: "@lena.art", time: "5h", avatar: "#e0a43a", following: true,
@@ -81,13 +95,13 @@ export const FEED_POSTS: FeedPost[] = (
       id: "p5", name: "Priya Nair", handle: "@priya.shoots", time: "3h", avatar: "#ec4899", following: true,
       text: "Keyframe for a short film I'm making. Sora is wild for pre-visualisation.",
       media: "radial-gradient(circle at 30% 70%, #38bdf8 0%, transparent 45%), radial-gradient(circle at 75% 25%, #a78bfa 0%, transparent 45%), linear-gradient(135deg, #0c4a6e, #1e1b4b)",
-      likes: 391, reposts: 57, replies: 31, provenance: prov(505, "sora-1.0", W3, 3),
+      likes: 391, reposts: 57, replies: 31, provenance: prov(505, "Sora", W3, 3),
     },
     {
       id: "p6", name: "Sam Whitaker", handle: "@sam_makes", time: "8h", avatar: "#f97316", following: false,
       text: "Poster concept for the weekend market — Firefly for the base art, finished by hand.",
       media: "radial-gradient(circle at 20% 25%, #facc15 0%, transparent 40%), radial-gradient(circle at 85% 80%, #ef4444 0%, transparent 45%), linear-gradient(135deg, #be185d, #7c2d12)",
-      likes: 128, reposts: 15, replies: 6, provenance: prov(606, "adobe-firefly-2", W4, 8),
+      likes: 128, reposts: 15, replies: 6, provenance: prov(606, "Adobe Firefly", W4, 8),
     },
     {
       id: "p7", name: "Aiko Tanaka", handle: "@aiko.draws", time: "22m", avatar: "#14b8a6", following: true,
@@ -99,7 +113,7 @@ export const FEED_POSTS: FeedPost[] = (
       id: "p8", name: "Marcus Bell", handle: "@marcusbell", time: "6h", avatar: "#6366f1", following: false,
       text: "Ideogram's text rendering has gotten absurdly good. Logo exploration for a coffee brand.",
       media: "radial-gradient(circle at 50% 50%, #fef3c7 0%, transparent 35%), linear-gradient(135deg, #451a03, #78350f 55%, #1c1917)",
-      likes: 87, reposts: 9, replies: 14, provenance: prov(808, "ideogram-v2", W1, 6),
+      likes: 87, reposts: 9, replies: 14, provenance: prov(808, "Ideogram", W1, 6),
     },
   ] as FeedPost[]
 ).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));

@@ -1,46 +1,46 @@
 /**
- * The Origina backend seam for this app.
+ * The app-facing Origina API. The UI imports only this file (plus the wallet/provider hook) — it never touches
+ * Solana types directly.
  *
- * The real fingerprint hashing, on-chain anchoring, and verification are being
- * built separately (SDK / API / Solana program). Until that lands, this class
- * stands in for them in the browser: fingerprints are computed locally and
- * anchored records are held in an in-memory Map for the session, with a short
- * delay standing in for the network round trip. Nothing is sent anywhere and
- * nothing is written to Solana, so the chain-derived fields (pdaAddress, slot,
- * explorerUrl) are null here and the UI omits them.
+ * - anchor(): fingerprints the file in the browser and writes a provenance record to the Origina program
+ *   (the connected wallet signs; it must be an active, registry-approved provider).
+ * - verify(): fingerprints the file in the browser and looks it up on-chain (read-only; no wallet needed).
  *
- * The UI only uses the types and methods exported from this file. To connect
- * the real backend, replace the bodies of anchor() and verify() (or this whole
- * file) with calls into the SDK/API and keep these shapes — no other app code
- * needs to change.
+ * The image itself is never sent anywhere — only its fingerprint goes on-chain.
  */
-
-import { computePHash, computeSHA256, hammingDistance, NEAR_MATCH_THRESHOLD } from "./hash";
-
-export type MediaType = "image" | "video" | "audio" | "text";
+import type { Rpc, SolanaRpcApi } from "@solana/kit";
+import {
+  type ChainClient,
+  anchorMedia,
+  findMatch,
+  getProviderName,
+  getSlotTime,
+} from "./chain/chain";
+import { explorerAddressUrl, explorerTxUrl } from "./chain/config";
+import { computePHash, computeSHA256 } from "./hash";
 
 export interface AnchorParams {
   fileData: Uint8Array;
-  modelId: string;
-  mediaType: MediaType;
-  walletPublicKey: string;
 }
 
 export interface AnchorResult {
-  /** The anchored record. If the file was anchored before, this is the original record. */
-  modelId: string;
-  creator: string;
   sha256: string;
   /** 64-bit perceptual hash as 0x-prefixed hex. */
   phash: string;
-  /** Unix seconds. */
-  timestamp: number;
-  /** Chain-derived; null until the on-chain program is connected. */
-  slot: number | null;
-  pdaAddress: string | null;
-  explorerUrl: string | null;
-  /** True when this file was already anchored and the existing record was returned (anchors are immutable). */
-  alreadyAnchored?: boolean;
+  /** The provider wallet that anchored the record, and its registered name. */
+  provider: string;
+  providerName: string | null;
+  /** The on-chain record account. */
+  recordAddress: string;
+  recordUrl: string;
+  /** Transaction that created the record; null when the file was already anchored by this provider. */
+  signature: string | null;
+  transactionUrl: string | null;
+  slot: number;
+  /** Unix seconds, best effort (null if the RPC can't resolve the slot's time). */
+  timestamp: number | null;
+  /** True when this provider had already anchored this exact file (anchors are immutable). */
+  alreadyAnchored: boolean;
 }
 
 export interface VerifyParams {
@@ -53,119 +53,98 @@ export interface VerifyResult {
   nearMatch: boolean;
   /** Hamming distance between perceptual hashes: 0 for an exact match, null when nothing matched. */
   pHashDistance: number | null;
-  modelId: string | null;
-  creator: string | null;
   sha256: string | null;
-  timestamp: number | null;
+  provider: string | null;
+  providerName: string | null;
+  creatorWallet: string | null;
+  recordAddress: string | null;
+  recordUrl: string | null;
   slot: number | null;
-  pdaAddress: string | null;
-  explorerUrl: string | null;
+  timestamp: number | null;
 }
 
-export interface OriginaClientOptions {
-  apiBaseUrl?: string;
-  cluster?: "devnet" | "mainnet-beta" | "testnet" | "localnet";
+export interface OriginaClientDeps {
+  /** Read-only RPC (always available). */
+  rpc: Rpc<SolanaRpcApi>;
+  /** Wallet-backed client; null while no wallet is connected. */
+  chain: ChainClient | null;
 }
 
-interface StoredRecord {
-  sha256: string;
-  phash: bigint;
-  modelId: string;
-  creator: string;
-  timestamp: number;
-}
-
-const ANCHOR_LATENCY_MS = 1200;
-const VERIFY_LATENCY_MS = 900;
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-function phashHex(phash: bigint): string {
-  return "0x" + phash.toString(16).padStart(16, "0");
-}
+const phashHex = (phash: bigint) => "0x" + phash.toString(16).padStart(16, "0");
 
 export class OriginaClient {
-  private readonly records = new Map<string, StoredRecord>();
-
-  constructor(_options: OriginaClientOptions = {}) {}
+  constructor(private readonly deps: OriginaClientDeps) {}
 
   async anchor(params: AnchorParams): Promise<AnchorResult> {
+    const { chain, rpc } = this.deps;
+    if (!chain) throw new Error("Connect a wallet before anchoring.");
+
     const sha256 = await computeSHA256(params.fileData);
     const phash = computePHash(params.fileData);
-    await sleep(ANCHOR_LATENCY_MS);
+    const outcome = await anchorMedia(chain, { sha256Hex: sha256, phash });
 
-    let record = this.records.get(sha256);
-    const alreadyAnchored = record !== undefined;
-
-    if (!record) {
-      record = {
-        sha256,
-        phash,
-        modelId: params.modelId,
-        creator: params.walletPublicKey,
-        timestamp: Math.floor(Date.now() / 1000),
-      };
-      this.records.set(sha256, record);
-    }
-
+    const { record } = outcome;
+    const [providerName, timestamp] = await Promise.all([
+      getProviderName(rpc, record.provider),
+      getSlotTime(rpc, record.slot),
+    ]);
+    const signature = outcome.kind === "anchored" ? outcome.signature : null;
     return {
-      modelId: record.modelId,
-      creator: record.creator,
-      sha256: record.sha256,
-      phash: phashHex(record.phash),
-      timestamp: record.timestamp,
-      slot: null,
-      pdaAddress: null,
-      explorerUrl: null,
-      alreadyAnchored,
+      sha256,
+      phash: phashHex(phash),
+      provider: record.provider,
+      providerName,
+      recordAddress: record.address,
+      recordUrl: explorerAddressUrl(record.address),
+      signature,
+      transactionUrl: signature ? explorerTxUrl(signature) : null,
+      slot: Number(record.slot),
+      timestamp,
+      alreadyAnchored: outcome.kind === "already-anchored",
     };
   }
 
   async verify(params: VerifyParams): Promise<VerifyResult> {
+    const { rpc } = this.deps;
     const sha256 = await computeSHA256(params.fileData);
     const phash = computePHash(params.fileData);
-    await sleep(VERIFY_LATENCY_MS);
+    const match = await findMatch(rpc, sha256, phash);
 
-    const exact = this.records.get(sha256);
-    if (exact) return this.toVerifyResult(exact, true, 0);
-
-    let best: { record: StoredRecord; distance: number } | null = null;
-    for (const record of Array.from(this.records.values())) {
-      const distance = hammingDistance(phash, record.phash);
-      if (distance < NEAR_MATCH_THRESHOLD && (!best || distance < best.distance)) {
-        best = { record, distance };
-      }
+    if (match.kind === "none") {
+      return {
+        found: false,
+        exactMatch: false,
+        nearMatch: false,
+        pHashDistance: null,
+        sha256: null,
+        provider: null,
+        providerName: null,
+        creatorWallet: null,
+        recordAddress: null,
+        recordUrl: null,
+        slot: null,
+        timestamp: null,
+      };
     }
-    if (best) return this.toVerifyResult(best.record, false, best.distance);
 
-    return {
-      found: false,
-      exactMatch: false,
-      nearMatch: false,
-      pHashDistance: null,
-      modelId: null,
-      creator: null,
-      sha256: null,
-      timestamp: null,
-      slot: null,
-      pdaAddress: null,
-      explorerUrl: null,
-    };
-  }
-
-  private toVerifyResult(record: StoredRecord, exact: boolean, distance: number): VerifyResult {
+    const { record } = match;
+    const [providerName, timestamp] = await Promise.all([
+      getProviderName(rpc, record.provider),
+      getSlotTime(rpc, record.slot),
+    ]);
     return {
       found: true,
-      exactMatch: exact,
-      nearMatch: !exact,
-      pHashDistance: distance,
-      modelId: record.modelId,
-      creator: record.creator,
-      sha256: record.sha256,
-      timestamp: record.timestamp,
-      slot: null,
-      pdaAddress: null,
-      explorerUrl: null,
+      exactMatch: match.kind === "exact",
+      nearMatch: match.kind === "near",
+      pHashDistance: match.kind === "near" ? match.distance : 0,
+      sha256: record.fileSha256Hex,
+      provider: record.provider,
+      providerName,
+      creatorWallet: record.creatorWallet,
+      recordAddress: record.address,
+      recordUrl: explorerAddressUrl(record.address),
+      slot: Number(record.slot),
+      timestamp,
     };
   }
 }

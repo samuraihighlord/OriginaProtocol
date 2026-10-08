@@ -1,36 +1,33 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { describeChainError } from "../lib/chain/errors";
+import { CLUSTER } from "../lib/chain/config";
+import type { ChainState } from "../lib/chain/useChain";
 import { describeFile, truncateAddress, truncateHash } from "../lib/format";
-import { MODEL_OPTIONS, modelLabel } from "../lib/models";
 import type { AnchorResult, OriginaClient } from "../lib/originaClient";
 import { Icon } from "./Icon";
 import { ImageDropzone } from "./ImageDropzone";
 import { Row } from "./Row";
+import { ProviderPanel, WalletList } from "./WalletPanels";
 
-const PLACEHOLDER_CREATOR = "unconnected-wallet";
-const STEPS = ["Upload image", "Select AI model", "Anchor"];
+const STEPS = ["Upload image", "Confirm provider", "Anchor"];
 
 type Status = "idle" | "working" | "done";
 
 export function AnchorView({
   client,
-  wallet,
+  chain,
   onGoSocial,
 }: {
   client: OriginaClient;
-  wallet: string | null;
+  chain: ChainState;
   onGoSocial: () => void;
 }) {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [fileLabel, setFileLabel] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
-  const [model, setModel] = useState(MODEL_OPTIONS[0].value);
-  const [stage, setStage] = useState(1);
-  const [modelOpen, setModelOpen] = useState(false);
-  const [actionOpen, setActionOpen] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AnchorResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const stageTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     return () => {
@@ -38,51 +35,38 @@ export function AnchorView({
     };
   }, [preview]);
 
-  useEffect(() => () => clearTimeout(stageTimer.current), []);
+  const canAnchor = !!bytes && chain.provider.phase === "ready" && chain.provider.status.kind === "active";
+  const stage = status === "done" ? 4 : !bytes ? 1 : canAnchor ? 3 : 2;
 
   async function handleFile(file: File) {
     setResult(null);
     setStatus("idle");
+    setError(null);
     const data = new Uint8Array(await file.arrayBuffer());
     setBytes(data);
     setFileLabel(describeFile(file, data));
     setPreview(URL.createObjectURL(file));
-
-    // upload done -> model selector slides in -> anchor button slides in (a model is preselected)
-    clearTimeout(stageTimer.current);
-    setStage(2);
-    setModelOpen(true);
-    stageTimer.current = setTimeout(() => {
-      setActionOpen(true);
-      setStage(3);
-    }, 450);
   }
 
   async function handleAnchor() {
-    if (!bytes || status === "working") return;
+    if (!bytes || !canAnchor || status === "working") return;
     setStatus("working");
     setResult(null);
     setError(null);
     try {
-      const anchored = await client.anchor({
-        fileData: bytes,
-        modelId: model,
-        mediaType: "image",
-        walletPublicKey: wallet ?? PLACEHOLDER_CREATOR,
-      });
-      setResult(anchored);
-      setStage(4);
+      setResult(await client.anchor({ fileData: bytes }));
       setStatus("done");
     } catch (err) {
-      setError(`Could not fingerprint this file: ${err instanceof Error ? err.message : String(err)}`);
+      setError(describeChainError(err));
       setStatus("idle");
+      void chain.refreshProvider();
     }
   }
 
   return (
     <>
       <h1 className="page-title">Anchor AI media</h1>
-      <p className="page-sub">Stamp your AI-generated image with a verifiable fingerprint.</p>
+      <p className="page-sub">Stamp your AI-generated image with a permanent on-chain fingerprint.</p>
 
       <div className="progress">
         {STEPS.map((label, i) => {
@@ -111,89 +95,83 @@ export function AnchorView({
         {bytes && <div className="file-meta">{fileLabel}</div>}
         {error && <div className="error-text">{error}</div>}
 
-        <div className={`reveal${modelOpen ? " open" : ""}`}>
-          <label className="field-label" htmlFor="anchor-model">
-            AI model
-          </label>
-          <select
-            id="anchor-model"
-            value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              if (bytes && status !== "done") setStage(3);
-            }}
-          >
-            {MODEL_OPTIONS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+        <div className={`reveal${bytes ? " open" : ""}`}>
+          <label className="field-label">Provider</label>
+          {chain.address ? (
+            <ProviderPanel chain={chain} />
+          ) : (
+            <>
+              <p className="muted-line">Anchoring is signed by your provider wallet. Connect one to continue.</p>
+              <WalletList chain={chain} />
+            </>
+          )}
         </div>
 
-        <div className={`reveal-up${actionOpen ? " open" : ""}`}>
+        <div className={`reveal-up${bytes ? " open" : ""}`}>
           <button
             type="button"
             className={`btn btn-primary btn-block${status === "done" ? " success" : ""}`}
-            disabled={!bytes || status !== "idle"}
+            disabled={!canAnchor || status !== "idle"}
             onClick={handleAnchor}
           >
             {status === "working" ? (
               <>
                 <span className="spinner" />
-                Anchoring…
+                Anchoring — approve in your wallet…
               </>
             ) : status === "done" ? (
               <>
                 <Icon name="check" />
-                Anchored
+                Anchored on Solana
               </>
             ) : (
               <>
                 <Icon name="link" />
-                Anchor fingerprint
+                Anchor on Solana
               </>
             )}
           </button>
-          <p className="micro">Only the cryptographic fingerprint is used — your image never leaves your device.</p>
-          {!wallet && bytes && (
-            <p className="micro">No wallet connected — this record will use a placeholder creator address.</p>
-          )}
+          <p className="micro">
+            Only the cryptographic fingerprint is written on-chain — your image never leaves your device. Network:
+            Solana {CLUSTER}. You pay about 0.0022 SOL of one-time rent plus a tiny network fee.
+          </p>
         </div>
 
         {result && (
           <div className="result">
             <div className="result-title">
               <Icon name="check" />
-              {result.alreadyAnchored ? "Already anchored — showing the existing record" : "Fingerprint anchored"}
+              {result.alreadyAnchored ? "Already anchored — showing the existing record" : "Fingerprint anchored on Solana"}
             </div>
             <Row label="SHA-256">
               <span title={result.sha256}>{truncateHash(result.sha256)}</span>
             </Row>
             <Row label="pHash">{result.phash}</Row>
-            <Row label="Model" mono={false}>
-              {modelLabel(result.modelId)}
+            <Row label="Provider" mono={false}>
+              {result.providerName ?? "Unnamed provider"} · <span className="mono">{truncateAddress(result.provider)}</span>
             </Row>
-            <Row label="Creator">
-              <span title={result.creator}>{truncateAddress(result.creator)}</span>
+            <Row label="Slot">{result.slot}</Row>
+            {result.timestamp !== null && (
+              <Row label="Anchored" mono={false}>
+                {new Date(result.timestamp * 1000).toLocaleString()}
+              </Row>
+            )}
+            <Row label="Record">
+              <span title={result.recordAddress}>{truncateAddress(result.recordAddress, 6, 6)}</span>
             </Row>
-            <Row label="Timestamp" mono={false}>
-              {result.timestamp} · {new Date(result.timestamp * 1000).toLocaleString()}
-            </Row>
-            {result.slot != null && <Row label="Slot">{result.slot}</Row>}
-            {result.pdaAddress && <Row label="PDA">{result.pdaAddress}</Row>}
             <div className="result-note">
-              {result.alreadyAnchored &&
-                "Anchors are immutable, so re-anchoring the same file keeps the original record. "}
-              {result.explorerUrl && (
+              {result.alreadyAnchored && "Anchors are immutable, so anchoring the same file again keeps the original record. "}
+              <a href={result.recordUrl} target="_blank" rel="noopener noreferrer">
+                View record on Solana Explorer ↗
+              </a>
+              {result.transactionUrl && (
                 <>
-                  <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer">
-                    View on Solana Explorer ↗
-                  </a>{" "}
+                  {" · "}
+                  <a href={result.transactionUrl} target="_blank" rel="noopener noreferrer">
+                    View transaction ↗
+                  </a>
                 </>
               )}
-              {!result.explorerUrl &&
-                "This record is held in your browser session; on-chain anchoring on Solana is still being connected."}
             </div>
             <button type="button" className="next-link" onClick={onGoSocial}>
               Now go to the Social page to see this image verified in a feed <Icon name="arrow" />

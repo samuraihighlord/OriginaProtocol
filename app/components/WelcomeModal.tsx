@@ -35,15 +35,15 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
                 How it works
               </h3>
               <p>
-                Your image is fingerprinted in your browser and never uploaded. Anchor a fingerprint
-                from the Anchor page, then check any image against anchored records from the Social
+                Your image is fingerprinted in your browser and never uploaded. Anchor its fingerprint
+                from the Anchor page, then check any image against the on-chain records from the Social
                 page.
               </p>
             </div>
           </div>
           <p className="status-note">
-            MVP release: Solana anchoring is still being connected, so for now records are held in
-            your browser session rather than on-chain.
+            MVP release, running on Solana devnet. Anchoring is limited to providers approved by the
+            Origina registry; anyone can check an image without a wallet.
           </p>
           <label className="check">
             <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />
