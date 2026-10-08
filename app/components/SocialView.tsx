@@ -167,6 +167,7 @@ export function SocialView({
               provider: match.provider ?? "",
               sha256: match.sha256 ?? "",
               creatorWallet: match.creatorWallet,
+              model: match.model,
               slot: match.slot,
               timestamp: match.timestamp,
               recordAddress: match.recordAddress,

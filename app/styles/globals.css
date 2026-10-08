@@ -481,20 +481,4 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
 .wallet-option:hover:not(:disabled) { background: rgba(29, 158, 117, 0.12); border-color: rgba(29, 158, 117, 0.5); }
 .wallet-option:disabled { opacity: 0.6; cursor: wait; }
 .wallet-option img { border-radius: 6px; }
-.provider-block {
-  padding: 12px 14px; margin-top: 4px;
-  border-radius: 12px; font-size: 13px;
-  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--glass-border);
-}
-.provider-block p { margin: 4px 0 10px; color: var(--text-2); }
-.provider-block p:last-child { margin-bottom: 0; }
-.provider-block .btn { margin-top: 0; padding: 8px 14px; font-size: 13px; }
-.provider-block.ok { border-color: rgba(61, 220, 151, 0.4); background: rgba(61, 220, 151, 0.07); }
-.provider-block.ok strong { color: #3ddc97; }
-.provider-block.warn { border-color: rgba(224, 164, 58, 0.4); background: rgba(224, 164, 58, 0.07); }
-.provider-block.bad { border-color: rgba(239, 106, 91, 0.4); background: rgba(239, 106, 91, 0.07); }
-.copy-row { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
-.copy-row code { flex: 1; font-size: 11px; word-break: break-all; color: #fff; background: rgba(255, 255, 255, 0.05); padding: 6px 8px; border-radius: 8px; }
-.copy-btn { border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.06); border-radius: 8px; color: #fff; font-size: 12px; padding: 5px 10px; cursor: pointer; }
-.copy-btn:hover { background: rgba(255, 255, 255, 0.12); }
 .popover .addr { font-size: 12px; color: var(--text-2); margin: 0 0 10px; word-break: break-all; }

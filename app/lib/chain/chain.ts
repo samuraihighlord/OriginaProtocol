@@ -11,8 +11,6 @@ import {
   getProgramDerivedAddress,
   getUtf8Encoder,
   isSome,
-  none,
-  some,
 } from "@solana/kit";
 import {
   ORIGINA_PROGRAM_ADDRESS,
@@ -23,14 +21,14 @@ import {
   findProvenanceRecordPda,
   findProviderAccountPda,
   findProviderApprovalPda,
-  getAnchorMediaInstructionAsync,
   getClaimProviderInstructionAsync,
   getProvenanceRecordDecoder,
 } from "../generated/origina/src/generated";
 import { NEAR_MATCH_THRESHOLD, hammingDistance } from "../hash";
-import { hexToBytes, bytesToHex, noC2paManifestHash, packPerceptualHash, unpackPerceptualHash } from "./fingerprint";
+import { parseModelMemo } from "../models";
+import { hexToBytes, bytesToHex, unpackPerceptualHash } from "./fingerprint";
 
-/** Anything built with the Kit RPC + payer plugins — a wallet-backed client in the app, a keypair-backed one in tests. */
+/** Anything built with the Kit RPC + payer plugins — a keypair-backed client in scripts and tests. */
 export type ChainClient = ClientWithRpc<SolanaRpcApi> &
   ClientWithPayer &
   ClientWithTransactionSending &
@@ -76,7 +74,7 @@ export async function claimProvider(client: ChainClient, approvedBy: Address) {
 
 /* -------------------------------- anchoring -------------------------------- */
 
-const eventAuthority = async () =>
+export const eventAuthority = async () =>
   (
     await getProgramDerivedAddress({
       programAddress: ORIGINA_PROGRAM_ADDRESS,
@@ -84,69 +82,12 @@ const eventAuthority = async () =>
     })
   )[0];
 
-export interface AnchorInput {
-  sha256Hex: string;
-  phash: bigint;
-}
-
-export type AnchorOutcome =
-  | { kind: "anchored"; signature: string; record: OnChainRecord }
-  | { kind: "already-anchored"; record: OnChainRecord };
-
-export class InsufficientFundsError extends Error {
-  constructor(public readonly needed: bigint, public readonly have: bigint) {
-    super("Not enough SOL to cover the record's rent and the network fee.");
-  }
-}
-
-export class NotAProviderError extends Error {
-  constructor(public readonly status: ProviderStatus) {
-    super("This wallet is not an active Origina provider.");
-  }
-}
-
-export async function anchorMedia(client: ChainClient, input: AnchorInput): Promise<AnchorOutcome> {
-  const provider = client.payer.address;
-
-  const status = await getProviderStatus(client.rpc, provider);
-  if (status.kind !== "active") throw new NotAProviderError(status);
-
-  const fileSha256 = hexToBytes(input.sha256Hex);
-  const [recordAddress] = await findProvenanceRecordPda({ provider, fileSha256 });
-
-  // Anchors are immutable: if this provider already anchored the file, return that record instead of failing.
-  const existing = await fetchMaybeProvenanceRecord(client.rpc, recordAddress);
-  if (existing.exists && existing.programAddress === ORIGINA_PROGRAM_ADDRESS) {
-    return { kind: "already-anchored", record: normalizeRecord(recordAddress, existing.data) };
-  }
-
-  // Fail early with a clear message instead of a wallet-side simulation error.
-  const rent = await client.getMinimumBalance(PROVENANCE_RECORD_ACCOUNT_SIZE);
-  const { value: balance } = await client.rpc.getBalance(provider).send();
-  const needed = BigInt(rent) + BigInt(10_000);
-  if (balance < needed) throw new InsufficientFundsError(needed, balance);
-
-  const perceptual = packPerceptualHash(input.phash);
-  const ix = await getAnchorMediaInstructionAsync({
-    provider: client.payer,
-    // Optional creator co-signer is omitted: a wallet cannot be both provider and creator.
-    eventAuthority: await eventAuthority(),
-    program: ORIGINA_PROGRAM_ADDRESS,
-    fileSha256,
-    perceptual: perceptual ? some(perceptual) : none(),
-    c2paManifestHash: await noC2paManifestHash(),
-    generatedAt: none(),
-  });
-
-  const result = await client.sendTransaction([ix]);
-
-  const created = await fetchMaybeProvenanceRecord(client.rpc, recordAddress, { commitment: "confirmed" });
-  if (!created.exists) throw new Error("The transaction was sent but the record could not be read back yet.");
-  return {
-    kind: "anchored",
-    signature: result.context.signature,
-    record: normalizeRecord(recordAddress, created.data),
-  };
+/** The provenance record this provider would hold for a file, and whether it already exists on-chain. */
+export async function findExistingRecord(rpc: ChainRpc, provider: Address, sha256Hex: string) {
+  const [recordAddress] = await findProvenanceRecordPda({ provider, fileSha256: hexToBytes(sha256Hex) });
+  const existing = await fetchMaybeProvenanceRecord(rpc, recordAddress);
+  const exists = existing.exists && existing.programAddress === ORIGINA_PROGRAM_ADDRESS;
+  return { recordAddress, record: exists ? normalizeRecord(recordAddress, existing.data) : null };
 }
 
 /* ------------------------------- verification ------------------------------ */
@@ -234,6 +175,39 @@ export async function getSlotTime(rpc: ChainRpc, slot: bigint): Promise<number |
   try {
     const t = await rpc.getBlockTime(slot).send();
     return t === null ? null : Number(t);
+  } catch {
+    return null;
+  }
+}
+
+/** Reads one record account; null if it does not exist (or is not owned by the program). */
+export async function getRecord(rpc: ChainRpc, address: Address): Promise<OnChainRecord | null> {
+  const account = await fetchMaybeProvenanceRecord(rpc, address, { commitment: "confirmed" });
+  return account.exists && account.programAddress === ORIGINA_PROGRAM_ADDRESS
+    ? normalizeRecord(address, account.data)
+    : null;
+}
+
+/**
+ * The AI model recorded with a record: the Memo in the transaction that created it. A record account is only ever
+ * touched by that one transaction, so its oldest signature is the creation. Memos are untrusted data and are
+ * validated before use; null when there is no (valid) memo or the RPC can no longer serve the transaction.
+ */
+export async function getRecordModel(rpc: ChainRpc, recordAddress: Address): Promise<string | null> {
+  try {
+    const signatures = await rpc.getSignaturesForAddress(recordAddress, { limit: 10, commitment: "confirmed" }).send();
+    const creation = [...signatures].reverse().find((s) => s.err === null);
+    if (!creation) return null;
+    const tx = await rpc
+      .getTransaction(creation.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" })
+      .send();
+    const instructions = (tx?.transaction.message.instructions ?? []) as readonly { program?: string; parsed?: unknown }[];
+    for (const ix of instructions) {
+      if (ix.program !== "spl-memo") continue;
+      const model = parseModelMemo(ix.parsed);
+      if (model) return model;
+    }
+    return null;
   } catch {
     return null;
   }

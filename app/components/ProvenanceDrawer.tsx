@@ -34,6 +34,11 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
           <Row label="Provider wallet">
             <span title={provenance.provider}>{truncateAddress(provenance.provider, 6, 6)}</span>
           </Row>
+          {provenance.model && (
+            <Row label="AI model" mono={false}>
+              {provenance.model}
+            </Row>
+          )}
           {provenance.creatorWallet && (
             <Row label="Creator wallet">
               <span title={provenance.creatorWallet}>{truncateAddress(provenance.creatorWallet, 6, 6)}</span>

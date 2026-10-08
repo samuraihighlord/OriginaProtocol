@@ -1,18 +1,19 @@
 const HOW_IT_WORKS = [
-  { title: "Generate", text: "An approved AI provider creates the media." },
+  { title: "Generate", text: "An AI model creates the media." },
   { title: "Fingerprint", text: "SHA-256 and pHash are computed locally — the file never leaves the device." },
   { title: "Anchor", text: "A 189-byte record is written to Solana permanently." },
   { title: "Verify", text: "Any platform checks origin with a single on-chain lookup." },
 ];
 
 const SCHEMA: { field: string; description: string; optional?: boolean }[] = [
-  { field: "provider", description: "The approved provider wallet that anchored the record" },
+  { field: "provider", description: "The registered provider that anchored the record (Origina)" },
   { field: "file_sha256", description: "Exact-match fingerprint of the file" },
   { field: "perceptual", description: "Perceptual hash (algorithm + hash) for near-match detection", optional: true },
   { field: "c2pa_manifest_hash", description: "Hash of the file's C2PA manifest" },
-  { field: "creator_wallet", description: "The creator's wallet, if they co-signed the anchor", optional: true },
+  { field: "creator_wallet", description: "The wallet that co-signed the anchor as the creator", optional: true },
   { field: "slot", description: "Solana slot that confirmed the record" },
   { field: "generated_at", description: "When the provider says the media was generated", optional: true },
+  { field: "model (transaction memo)", description: "The AI model, recorded in the same transaction", optional: true },
 ];
 
 export function AboutView() {
@@ -47,13 +48,13 @@ export function AboutView() {
       <div className="glass card">
         <ul className="tips-list">
           <li>
-            <strong>Connect a provider wallet.</strong> Only providers approved by the Origina registry can
-            anchor. Connect a wallet in the top right; if it&apos;s been approved, claim your registration once
-            and you&apos;re ready.
+            <strong>Connect a wallet.</strong> Connect a Solana wallet in the top right. It is recorded as the
+            creator of the image and only has to approve the record — it needs no SOL.
           </li>
           <li>
             <strong>Anchor an image.</strong> Drop an AI-generated image on the Anchor page and anchor its
-            fingerprint. You pay a one-time rent deposit of about 0.002 SOL plus a tiny network fee.
+            fingerprint, and say which model generated it. Origina pays the one-time rent deposit of about
+            0.002 SOL and the network fee.
           </li>
           <li>
             <strong>Check it on a platform.</strong> On the Social page, upload an image under &quot;Add to

@@ -3,6 +3,8 @@ export interface Provenance {
   provider: string;
   sha256: string;
   creatorWallet: string | null;
+  /** The AI model recorded with the anchor, when known. */
+  model?: string | null;
   slot: number | null;
   /** Unix seconds; null when unknown. */
   timestamp: number | null;

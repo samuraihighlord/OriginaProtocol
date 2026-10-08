@@ -1,8 +1,6 @@
 import { SOLANA_ERROR__INSTRUCTION_ERROR__CUSTOM, isSolanaError } from "@solana/kit";
+import { AnchorApiResponseError } from "../anchorApi";
 import { getOriginaErrorMessage, type OriginaError } from "../generated/origina/src/generated";
-import { InsufficientFundsError } from "./chain";
-
-const SOL = 1_000_000_000;
 
 function customProgramErrorCode(err: unknown): number | null {
   // Preflight failures wrap the instruction error a few levels down the cause chain.
@@ -14,9 +12,7 @@ function customProgramErrorCode(err: unknown): number | null {
 
 /** Turns anything thrown while talking to the wallet / RPC / program into a message a user can act on. */
 export function describeChainError(err: unknown): string {
-  if (err instanceof InsufficientFundsError) {
-    return `Not enough SOL: this anchor needs about ${(Number(err.needed) / SOL).toFixed(4)} SOL (record rent plus fee) and the wallet has ${(Number(err.have) / SOL).toFixed(4)} SOL.`;
-  }
+  if (err instanceof AnchorApiResponseError) return err.message;
 
   const code = customProgramErrorCode(err);
   if (code !== null) {

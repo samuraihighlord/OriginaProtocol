@@ -3,13 +3,14 @@ import { describeChainError } from "../lib/chain/errors";
 import { CLUSTER } from "../lib/chain/config";
 import type { ChainState } from "../lib/chain/useChain";
 import { describeFile, truncateAddress, truncateHash } from "../lib/format";
+import { MAX_MODEL_LENGTH, MODEL_OPTIONS, OTHER_MODEL, normalizeModel } from "../lib/models";
 import type { AnchorResult, OriginaClient } from "../lib/originaClient";
 import { Icon } from "./Icon";
 import { ImageDropzone } from "./ImageDropzone";
 import { Row } from "./Row";
-import { ProviderPanel, WalletList } from "./WalletPanels";
+import { WalletList } from "./WalletPanels";
 
-const STEPS = ["Upload image", "Confirm provider", "Anchor"];
+const STEPS = ["Upload image", "Connect wallet", "Anchor"];
 
 type Status = "idle" | "working" | "done";
 
@@ -28,6 +29,8 @@ export function AnchorView({
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AnchorResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modelChoice, setModelChoice] = useState("");
+  const [customModel, setCustomModel] = useState("");
 
   useEffect(() => {
     return () => {
@@ -35,8 +38,9 @@ export function AnchorView({
     };
   }, [preview]);
 
-  const canAnchor = !!bytes && chain.provider.phase === "ready" && chain.provider.status.kind === "active";
-  const stage = status === "done" ? 4 : !bytes ? 1 : canAnchor ? 3 : 2;
+  const model = modelChoice === OTHER_MODEL ? normalizeModel(customModel) : modelChoice || null;
+  const canAnchor = !!bytes && !!chain.address && !!model;
+  const stage = status === "done" ? 4 : !bytes ? 1 : !chain.address ? 2 : 3;
 
   async function handleFile(file: File) {
     setResult(null);
@@ -49,17 +53,16 @@ export function AnchorView({
   }
 
   async function handleAnchor() {
-    if (!bytes || !canAnchor || status === "working") return;
+    if (!bytes || !model || !canAnchor || status === "working") return;
     setStatus("working");
     setResult(null);
     setError(null);
     try {
-      setResult(await client.anchor({ fileData: bytes }));
+      setResult(await client.anchor({ fileData: bytes, model }));
       setStatus("done");
     } catch (err) {
       setError(describeChainError(err));
       setStatus("idle");
-      void chain.refreshProvider();
     }
   }
 
@@ -96,12 +99,43 @@ export function AnchorView({
         {error && <div className="error-text">{error}</div>}
 
         <div className={`reveal${bytes ? " open" : ""}`}>
-          <label className="field-label">Provider</label>
+          <label className="field-label" htmlFor="model-select">
+            AI model used to generate this image
+          </label>
+          <select id="model-select" value={modelChoice} onChange={(e) => setModelChoice(e.target.value)}>
+            <option value="" disabled>
+              Select a model…
+            </option>
+            {MODEL_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            <option value={OTHER_MODEL}>{OTHER_MODEL}</option>
+          </select>
+          {modelChoice === OTHER_MODEL && (
+            <input
+              type="text"
+              value={customModel}
+              maxLength={MAX_MODEL_LENGTH}
+              placeholder="Model name"
+              aria-label="Model name"
+              style={{ marginTop: 8 }}
+              onChange={(e) => setCustomModel(e.target.value)}
+            />
+          )}
+
+          <label className="field-label" style={{ marginTop: 14 }}>
+            Your wallet
+          </label>
           {chain.address ? (
-            <ProviderPanel chain={chain} />
+            <p className="muted-line">
+              {chain.connectedWalletName} · <span className="mono">{truncateAddress(chain.address, 6, 6)}</span> — it
+              co-signs the record as the creator.
+            </p>
           ) : (
             <>
-              <p className="muted-line">Anchoring is signed by your provider wallet. Connect one to continue.</p>
+              <p className="muted-line">Connect a wallet to be recorded as the creator. It needs no SOL.</p>
               <WalletList chain={chain} />
             </>
           )}
@@ -133,7 +167,8 @@ export function AnchorView({
           </button>
           <p className="micro">
             Only the cryptographic fingerprint is written on-chain — your image never leaves your device. Network:
-            Solana {CLUSTER}. You pay about 0.0022 SOL of one-time rent plus a tiny network fee.
+            Solana {CLUSTER}. Origina is the registered provider and pays the record&apos;s rent and network fee; your
+            wallet just approves being recorded as the creator.
           </p>
         </div>
 
@@ -150,6 +185,16 @@ export function AnchorView({
             <Row label="Provider" mono={false}>
               {result.providerName ?? "Unnamed provider"} · <span className="mono">{truncateAddress(result.provider)}</span>
             </Row>
+            {result.model && (
+              <Row label="AI model" mono={false}>
+                {result.model}
+              </Row>
+            )}
+            {result.creatorWallet && (
+              <Row label="Creator">
+                <span title={result.creatorWallet}>{truncateAddress(result.creatorWallet, 6, 6)}</span>
+              </Row>
+            )}
             <Row label="Slot">{result.slot}</Row>
             {result.timestamp !== null && (
               <Row label="Anchored" mono={false}>

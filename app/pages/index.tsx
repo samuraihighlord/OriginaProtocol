@@ -21,8 +21,8 @@ const BANNERS: Record<BannerPage, JSX.Element> = {
     <>
       <strong>What anchoring does.</strong> It writes a verifiable fingerprint of your AI-generated image
       to Solana. Your file stays on your device — only the fingerprint goes on-chain, so anyone can later
-      check where the image came from without Origina ever holding it. Only providers approved by the
-      Origina registry can anchor.
+      check where the image came from without Origina ever holding it. Origina is the registered provider
+      and pays for the record; your wallet co-signs as the creator and needs no SOL.
     </>
   ),
   social: (

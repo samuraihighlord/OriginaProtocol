@@ -3,7 +3,7 @@ import { CLUSTER } from "../lib/chain/config";
 import type { ChainState } from "../lib/chain/useChain";
 import { truncateAddress } from "../lib/format";
 import { Icon, type IconName } from "./Icon";
-import { ProviderPanel, WalletList } from "./WalletPanels";
+import { WalletList } from "./WalletPanels";
 
 export type View = "about" | "anchor" | "social";
 
@@ -16,7 +16,7 @@ const TABS: { view: View; label: string; icon: IconName }[] = [
 function WalletMenu({ chain }: { chain: ChainState }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { address, connectedWalletName, status, provider, disconnect, walletError } = chain;
+  const { address, connectedWalletName, status, disconnect, walletError } = chain;
 
   useEffect(() => {
     if (!open) return;
@@ -34,8 +34,6 @@ function WalletMenu({ chain }: { chain: ChainState }) {
     };
   }, [open]);
 
-  const dotClass = provider.phase === "ready" && provider.status.kind === "active" ? "dot" : "dot warn";
-
   return (
     <div className="nav-right" ref={ref}>
       <button
@@ -48,7 +46,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
       >
         {address ? (
           <>
-            <span className={dotClass} />
+            <span className="dot" />
             <span className="mono">{truncateAddress(address, 4, 4)}</span>
           </>
         ) : (
@@ -68,7 +66,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
                 <br />
                 <span className="mono">{address}</span>
               </p>
-              <ProviderPanel chain={chain} />
+              <p>Origina covers the on-chain fee. Your wallet only co-signs as the creator.</p>
               {walletError && <div className="error-text">{walletError}</div>}
               <div className="row" style={{ marginTop: 12 }}>
                 <button
@@ -86,7 +84,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
             </>
           ) : (
             <>
-              <p>Connect a Solana wallet to anchor images. Checking an image never needs a wallet.</p>
+              <p>Connect a Solana wallet to anchor images. It is recorded as the creator, and needs no SOL. Checking an image never needs a wallet.</p>
               <WalletList chain={chain} />
               {walletError && <div className="error-text">{walletError}</div>}
             </>
