@@ -3,6 +3,8 @@ import { CLUSTER } from "../lib/chain/config";
 import type { ChainState } from "../lib/chain/useChain";
 import { truncateAddress } from "../lib/format";
 import { Icon } from "./Icon";
+import { LogoMark } from "./LogoMark";
+import { Wordmark } from "./Wordmark";
 import { WalletList } from "./WalletPanels";
 
 export type View = "home" | "anchor" | "social";
@@ -108,8 +110,11 @@ export function NavBar({ view, onChange, chain }: NavBarProps) {
   return (
     <header className="topnav">
       <div className="brand">
-        <div className="logo-mark">O</div>
-        <span className="brand-name">Origina Protocol</span>
+        <LogoMark height={36} />
+        <span className="brand-name">
+          <Wordmark height={22} />
+          <span className="brand-sub">Protocol</span>
+        </span>
         <span className="pill">demo</span>
       </div>
 

@@ -22,7 +22,7 @@ body {
   min-height: 100vh;
   color: var(--text);
   background: linear-gradient(135deg, #0a0a0f 0%, #0d1117 40%, #0a0f1a 70%, #080d12 100%) fixed;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
   overflow-x: hidden;
@@ -126,14 +126,14 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
   background: linear-gradient(90deg, transparent, var(--teal), transparent);
 }
+.logo-img { display: block; width: auto; flex-shrink: 0; filter: drop-shadow(0 0 8px rgba(29, 158, 117, 0.45)); user-select: none; }
+.prov-badge .logo-img { filter: drop-shadow(0 0 5px rgba(29, 158, 117, 0.5)); }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; justify-self: start; }
-.logo-mark {
-  width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(135deg, #1D9E75, #0F6E56);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 600; font-size: 15px; color: #fff; flex-shrink: 0;
-}
-.brand-name { font-weight: 500; font-size: 15px; white-space: nowrap; }
+.brand-name { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+.brand-sub { font-weight: 500; font-size: 13px; letter-spacing: 0.02em; color: var(--text-2); }
+.wordmark-img { display: block; width: auto; flex-shrink: 0; user-select: none; filter: drop-shadow(0 0 10px rgba(29, 158, 117, 0.28)); }
+.welcome-title { display: inline-flex; align-items: baseline; gap: 10px; }
+.welcome-title .brand-sub { font-size: 15px; }
 .pill {
   display: inline-flex; align-items: center;
   padding: 2px 9px; border-radius: 999px;
@@ -269,7 +269,6 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
 .social-jump { margin: -10px 0 20px; font-size: 13.5px; }
 
 /* ---------- social ---------- */
-.mini-mark { width: 16px; height: 16px; border-radius: 5px; background: linear-gradient(135deg, #1D9E75, #0F6E56); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; flex-shrink: 0; }
 
 .feed { margin-top: 6px; }
 .post { display: flex; gap: 12px; padding: 16px 6px; border-bottom: 1px solid var(--glass-border); animation: pageIn 0.35s ease; }
@@ -281,7 +280,7 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
 .post-handle, .post-time { color: var(--text-2); font-size: 13.5px; }
 .post-text { margin: 4px 0 10px; font-size: 14.5px; word-break: break-word; }
 .post-media { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid var(--glass-border); aspect-ratio: 16 / 10; background-size: cover; }
-.post-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.post-media > img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .prov-badge {
   position: absolute; right: 10px; bottom: 10px;
   display: inline-flex; align-items: center; gap: 6px;
@@ -321,7 +320,6 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
 .modal-lg { max-width: 640px; }
 .modal-sm { max-width: 460px; }
 .modal-top { display: flex; align-items: center; gap: 12px; }
-.modal-top .logo-mark { width: 40px; height: 40px; font-size: 20px; border-radius: 10px; }
 .modal h2 { font-size: 22px; font-weight: 500; margin: 0; }
 .modal .definition { color: var(--text-2); margin: 8px 0 0; }
 .divider { height: 1px; background: var(--glass-border); margin: 18px 0; border: none; }
@@ -369,7 +367,7 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
   .top-nav { grid-area: nav; justify-self: center; }
   .container { padding: 20px 14px 48px; }
   .brand { gap: 8px; }
-  .brand-name { font-size: 13px; }
+  .brand-name .brand-sub { display: none; }
   .brand .pill { padding: 2px 7px; font-size: 10px; }
   #wallet-btn { padding: 7px 10px; font-size: 12px; }
   .p-step span.lbl { display: none; }
@@ -573,3 +571,24 @@ p:hover:not(button *), span:hover:not(button *), li:hover:not(button *), label:h
   .landing-hero { min-height: 0; padding: 12px 0 28px; }
   .edge-title { font-size: 22px; }
 }
+
+
+/* ---------- type styles (Poppins) ----------
+   Regular is the base. Bold marks the key phrase or the heading, italic marks asides and emphasis. The real italic
+   and bold faces are loaded (see _document.tsx), so nothing is synthesised. */
+strong, b { font-weight: 700; color: #fff; }
+em, i { font-style: italic; }
+.t-regular { font-weight: 400; font-style: normal; }
+.t-italic { font-style: italic; }
+.t-bold { font-weight: 700; }
+.modal-block p + p { margin-top: 8px; }
+.modal-block strong.t-teal { color: #3ddc97; }
+
+.landing-title { font-weight: 600; letter-spacing: -0.01em; }
+.page-title, .section-title { font-weight: 600; }
+.page-sub { font-style: italic; }
+.how-card h3, .compare-card h3 { font-weight: 700; }
+.edge-title { font-weight: 700; font-style: italic; }
+.honesty-note p { font-style: italic; }
+.landing-footer span { font-style: italic; }
+.modal h2 { font-weight: 600; }

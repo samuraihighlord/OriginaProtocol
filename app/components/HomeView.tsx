@@ -95,8 +95,10 @@ export function HomeView({ onGoAnchor }: { onGoAnchor: () => void }) {
           likely AI-generated, 81% likely synthetic. Those scores degrade after compression. They fail after a
           screenshot. They cannot tell you who made something or when. They guess. Origina does not guess. When a file
           is anchored, its SHA-256 hash is written permanently to Solana. When that same file is uploaded to any platform
-          that reads the Origina record, the hash either matches the on-chain record or it does not. That is not a score.
-          That is a cryptographic fact. The record either exists or it does not. No classifier needed.
+          that reads the Origina record, the hash either matches the on-chain record or it does not. <strong>
+            <em>That is not a score. That is a cryptographic fact.</em>
+          </strong>{" "}
+          The record either exists or it does not. No classifier needed.
         </p>
         <div className="compare">
           {COMPARISON.map((c) => (
@@ -113,7 +115,7 @@ export function HomeView({ onGoAnchor }: { onGoAnchor: () => void }) {
       </section>
 
       <footer className="landing-footer">
-        <span>Origina Protocol · MIT License · Built on Solana · Colosseum Hackathon 2026</span>
+        <span className="t-italic">Origina Protocol · MIT License · Built on Solana · Colosseum Hackathon 2026</span>
         <a href="https://github.com/samuraihighlord/OriginaProtocol" target="_blank" rel="noopener noreferrer">
           GitHub ↗
         </a>

@@ -119,6 +119,10 @@ export default function Home() {
         <title>Origina Protocol</title>
         <meta name="description" content="The open-source AI media provenance layer on Solana." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#0a0a0f" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </Head>
 
       <div className="orb orb-teal" />

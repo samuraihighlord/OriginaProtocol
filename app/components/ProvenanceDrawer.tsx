@@ -36,7 +36,7 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
             AI-generated content
           </p>
           <p className="prov-model">
-            Generated with <span className="mono t-teal">{provenance.model ?? "an unknown model"}</span>
+            <em>Generated with</em> <span className="mono t-teal">{provenance.model ?? "an unknown model"}</span>
           </p>
 
           {href ? (

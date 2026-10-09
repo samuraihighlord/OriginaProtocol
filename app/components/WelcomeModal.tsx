@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { LogoMark } from "./LogoMark";
+import { Wordmark } from "./Wordmark";
 
 export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) => void }) {
   const [dontShow, setDontShow] = useState(false);
@@ -14,8 +16,11 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
       <div className="grad-border modal-lg">
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
           <div className="modal-top">
-            <div className="logo-mark">O</div>
-            <h2 id="welcome-title">Origina Protocol</h2>
+            <LogoMark height={52} />
+            <h2 id="welcome-title" className="welcome-title">
+              <Wordmark height={32} />
+              <span className="brand-sub">Protocol</span>
+            </h2>
           </div>
           <hr className="divider" />
 
@@ -24,7 +29,7 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
             <p>
               This is a proof of concept demo. It exists to demonstrate that the anchoring mechanism works — that a
               cryptographic fingerprint of an AI-generated image can be extracted in the browser, sent to Solana, and
-              permanently recorded on-chain. This is not the finished product.
+              permanently recorded on-chain. <strong><em>This is not the finished product.</em></strong>
             </p>
           </div>
 
@@ -36,15 +41,11 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
               the named provider. The file never leaves your device. The fingerprint lives on-chain forever. Any
               platform can verify that record with a single on-chain lookup.
             </p>
-          </div>
-
-          <div className="modal-block">
-            <h3 className="eyebrow eyebrow-sm t-muted">Demo vs real product</h3>
             <p>
-              This demo runs on Solana devnet, so the SOL it uses has no real value. Every anchor is a real devnet
-              transaction, and a connected wallet pays a one-time deposit of about 0.0022 SOL, which would be real money
-              on mainnet. Wallets connect through the Solana Wallet Standard (Phantom, Backpack, Solflare and others),
-              and you can also anchor without a wallet.
+              This demo is just to show the mechanic.{" "}
+              <strong className="t-teal">
+                The real product is the SDK and API that can be plugged into other web apps.
+              </strong>
             </p>
           </div>
 

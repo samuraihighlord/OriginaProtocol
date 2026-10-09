@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { FEED_POSTS, type FeedPost } from "../lib/feed";
 import { Icon } from "./Icon";
+import { LogoMark } from "./LogoMark";
 import { ProvenanceDrawer } from "./ProvenanceDrawer";
 
 type FeedTab = "foryou" | "verified";
@@ -48,7 +49,7 @@ function PostCard({
               aria-label="View provenance record"
               onClick={() => onOpenProvenance(post)}
             >
-              <span className="mini-mark">O</span>
+              <LogoMark height={17} />
               AI-generated
             </button>
           )}
