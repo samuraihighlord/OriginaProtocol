@@ -48,13 +48,13 @@ export function AboutView() {
       <div className="glass card">
         <ul className="tips-list">
           <li>
-            <strong>Connect a wallet.</strong> Connect a Solana wallet in the top right. It is recorded as the
-            creator of the image and only has to approve the record — it needs no SOL.
+            <strong>Connect a wallet (optional).</strong> Connect a Solana wallet in the top right to be recorded
+            as the creator of the image. It approves the record and pays its small devnet SOL deposit and fee.
           </li>
           <li>
             <strong>Anchor an image.</strong> Drop an AI-generated image on the Anchor page and anchor its
-            fingerprint, and say which model generated it. Origina pays the one-time rent deposit of about
-            0.002 SOL and the network fee.
+            fingerprint, and say which model generated it. The one-time record deposit is about 0.002 SOL plus a
+            tiny network fee, paid by your connected wallet (or by Origina if you anchor without one).
           </li>
           <li>
             <strong>Check it on a platform.</strong> On the Social page, upload an image under &quot;Add to

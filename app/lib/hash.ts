@@ -8,6 +8,10 @@ function toArrayBuffer(data: Uint8Array): ArrayBuffer {
 }
 
 export async function computeSHA256(data: Uint8Array): Promise<string> {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    // WebCrypto only exists in secure contexts (https or localhost).
+    throw new Error("Hashing needs a secure connection. Open this page over https (or on localhost).");
+  }
   const digest = await crypto.subtle.digest("SHA-256", toArrayBuffer(data));
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))

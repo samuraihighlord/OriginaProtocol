@@ -307,6 +307,9 @@ label.field-label { display: block; font-size: 12px; font-weight: 500; color: va
   animation: resultIn 0.5s ease;
 }
 @keyframes resultIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.result.existing { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.18); }
+.result.existing .result-title { color: #fff; }
+.existing-explainer { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
 .result-title { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; margin-bottom: 10px; color: #3ddc97; }
 .kv { display: flex; justify-content: space-between; gap: 18px; padding: 5px 0; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .kv:last-of-type { border-bottom: none; }

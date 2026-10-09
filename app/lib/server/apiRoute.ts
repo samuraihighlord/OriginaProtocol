@@ -6,12 +6,12 @@ const clientIp = (req: NextApiRequest) =>
   req.socket.remoteAddress ||
   "unknown";
 
-/** Shared plumbing for the anchor routes: POST only, JSON errors, no secrets or stack traces in responses. */
-export function postJsonRoute<T>(handler: (body: unknown, ip: string) => Promise<T>) {
+/** Shared plumbing for the anchor routes: one method, JSON errors, no secrets or stack traces in responses. */
+function jsonRoute<T>(method: "GET" | "POST", handler: (body: unknown, ip: string) => Promise<T>) {
   return async function route(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader("Cache-Control", "no-store");
-    if (req.method !== "POST") {
-      res.setHeader("Allow", "POST");
+    if (req.method !== method) {
+      res.setHeader("Allow", method);
       return res.status(405).json({ error: "Method not allowed." });
     }
     try {
@@ -26,3 +26,6 @@ export function postJsonRoute<T>(handler: (body: unknown, ip: string) => Promise
     }
   };
 }
+
+export const postJsonRoute = <T>(handler: (body: unknown, ip: string) => Promise<T>) => jsonRoute("POST", handler);
+export const getJsonRoute = <T>(handler: (ip: string) => Promise<T>) => jsonRoute("GET", (_body, ip) => handler(ip));

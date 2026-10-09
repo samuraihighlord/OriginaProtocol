@@ -25,7 +25,7 @@ import {
   getProvenanceRecordDecoder,
 } from "../generated/origina/src/generated";
 import { NEAR_MATCH_THRESHOLD, hammingDistance } from "../hash";
-import { parseModelMemo } from "../models";
+import { parseAnchorMemo } from "../models";
 import { hexToBytes, bytesToHex, unpackPerceptualHash } from "./fingerprint";
 
 /** Anything built with the Kit RPC + payer plugins — a keypair-backed client in scripts and tests. */
@@ -96,10 +96,13 @@ export interface OnChainRecord {
   address: Address;
   provider: Address;
   fileSha256Hex: string;
+  /** Hex of the stored C2PA manifest hash; the fixed sentinel when the image had no manifest. */
+  c2paManifestHashHex: string;
   phash: bigint | null;
   creatorWallet: Address | null;
   slot: bigint;
   generatedAt: bigint | null;
+  bump: number;
 }
 
 type DecodedRecord = ReturnType<ReturnType<typeof getProvenanceRecordDecoder>["decode"]>;
@@ -110,10 +113,12 @@ function normalizeRecord(address: Address, data: DecodedRecord): OnChainRecord {
     address,
     provider: data.provider,
     fileSha256Hex: bytesToHex(data.fileSha256),
+    c2paManifestHashHex: bytesToHex(data.c2paManifestHash),
     phash: perceptual,
     creatorWallet: isSome(data.creatorWallet) ? data.creatorWallet.value : null,
     slot: data.slot,
     generatedAt: isSome(data.generatedAt) ? data.generatedAt.value : null,
+    bump: data.bump,
   };
 }
 
@@ -189,11 +194,11 @@ export async function getRecord(rpc: ChainRpc, address: Address): Promise<OnChai
 }
 
 /**
- * The AI model recorded with a record: the Memo in the transaction that created it. A record account is only ever
+ * What was recorded alongside a record: the Memo in the transaction that created it. A record account is only ever
  * touched by that one transaction, so its oldest signature is the creation. Memos are untrusted data and are
  * validated before use; null when there is no (valid) memo or the RPC can no longer serve the transaction.
  */
-export async function getRecordModel(rpc: ChainRpc, recordAddress: Address): Promise<string | null> {
+export async function getRecordMemo(rpc: ChainRpc, recordAddress: Address) {
   try {
     const signatures = await rpc.getSignaturesForAddress(recordAddress, { limit: 10, commitment: "confirmed" }).send();
     const creation = [...signatures].reverse().find((s) => s.err === null);
@@ -204,11 +209,15 @@ export async function getRecordModel(rpc: ChainRpc, recordAddress: Address): Pro
     const instructions = (tx?.transaction.message.instructions ?? []) as readonly { program?: string; parsed?: unknown }[];
     for (const ix of instructions) {
       if (ix.program !== "spl-memo") continue;
-      const model = parseModelMemo(ix.parsed);
-      if (model) return model;
+      const memo = parseAnchorMemo(ix.parsed);
+      if (memo) return memo;
     }
     return null;
   } catch {
     return null;
   }
+}
+
+export async function getRecordModel(rpc: ChainRpc, recordAddress: Address): Promise<string | null> {
+  return (await getRecordMemo(rpc, recordAddress))?.model ?? null;
 }

@@ -42,8 +42,8 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
             </div>
           </div>
           <p className="status-note">
-            MVP release, running on Solana devnet. Origina is the registered provider and pays for each
-            record; you connect a wallet to be recorded as the creator, and anyone can check an image without one.
+            MVP release, running on Solana devnet. Origina is the registered provider; connect a wallet to be recorded as the creator and pay
+            the small devnet SOL fee, or anchor and check images without one.
           </p>
           <label className="check">
             <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />

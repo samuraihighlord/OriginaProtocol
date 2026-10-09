@@ -77,6 +77,8 @@ export function useChain() {
     status: wallet.status,
     connectedWalletName: wallet.connected?.wallet.name ?? null,
     address: connectedAddress,
+    /** A wallet is connected but can't sign for this cluster (e.g. Phantom is not in Testnet Mode for devnet). */
+    walletCannotSign: !!wallet.connected && !wallet.connected.signer,
     walletError,
     connect,
     disconnect,

@@ -66,7 +66,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
                 <br />
                 <span className="mono">{address}</span>
               </p>
-              <p>Origina covers the on-chain fee. Your wallet only co-signs as the creator.</p>
+              <p>Your wallet co-signs the record as the creator and pays its devnet SOL deposit and network fee.</p>
               {walletError && <div className="error-text">{walletError}</div>}
               <div className="row" style={{ marginTop: 12 }}>
                 <button
@@ -84,7 +84,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
             </>
           ) : (
             <>
-              <p>Connect a Solana wallet to anchor images. It is recorded as the creator, and needs no SOL. Checking an image never needs a wallet.</p>
+              <p>Connect a Solana wallet to be recorded as the creator of an anchored image. It pays the small devnet SOL deposit and fee. Anchoring and checking an image also work without one.</p>
               <WalletList chain={chain} />
               {walletError && <div className="error-text">{walletError}</div>}
             </>
