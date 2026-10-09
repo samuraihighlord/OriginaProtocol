@@ -2,16 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { CLUSTER } from "../lib/chain/config";
 import type { ChainState } from "../lib/chain/useChain";
 import { truncateAddress } from "../lib/format";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
 import { WalletList } from "./WalletPanels";
 
-export type View = "about" | "anchor" | "social";
-
-const TABS: { view: View; label: string; icon: IconName }[] = [
-  { view: "about", label: "About", icon: "info" },
-  { view: "anchor", label: "Anchor", icon: "link" },
-  { view: "social", label: "Social", icon: "chat" },
-];
+export type View = "home" | "anchor" | "social";
 
 function WalletMenu({ chain }: { chain: ChainState }) {
   const [open, setOpen] = useState(false);
@@ -104,48 +98,41 @@ interface NavBarProps {
   chain: ChainState;
 }
 
+const ITEMS: { view: View; label: string; icon: "anchor" | "home" | "chat" }[] = [
+  { view: "anchor", label: "Anchor", icon: "anchor" },
+  { view: "home", label: "Home", icon: "home" },
+  { view: "social", label: "Social", icon: "chat" },
+];
+
 export function NavBar({ view, onChange, chain }: NavBarProps) {
   return (
-    <>
-      <header className="topnav">
-        <div className="brand">
-          <div className="logo-mark">O</div>
-          <span className="brand-name">Origina Protocol</span>
-          <span className="pill">MVP</span>
-        </div>
+    <header className="topnav">
+      <div className="brand">
+        <div className="logo-mark">O</div>
+        <span className="brand-name">Origina Protocol</span>
+        <span className="pill">demo</span>
+      </div>
 
-        <nav className="nav-tabs" role="tablist" aria-label="Pages">
-          {TABS.map((t) => (
+      <nav className="top-nav" aria-label="Pages">
+        {ITEMS.map((item) => {
+          const isHome = item.view === "home";
+          return (
             <button
-              key={t.view}
+              key={item.view}
               type="button"
-              role="tab"
-              aria-selected={view === t.view}
-              className={`tab${view === t.view ? " active" : ""}`}
-              onClick={() => onChange(t.view)}
+              className={`tn-item${isHome ? " tn-home" : ""}${view === item.view ? " active" : ""}`}
+              aria-label={isHome ? "Home" : undefined}
+              aria-current={view === item.view ? "page" : undefined}
+              onClick={() => onChange(item.view)}
             >
-              <Icon name={t.icon} />
-              {t.label}
+              <Icon name={item.icon} />
+              {!isHome && <span>{item.label}</span>}
             </button>
-          ))}
-        </nav>
-
-        <WalletMenu chain={chain} />
-      </header>
-
-      <nav className="bottom-tabs" aria-label="Pages (mobile)">
-        {TABS.map((t) => (
-          <button
-            key={t.view}
-            type="button"
-            className={`tab${view === t.view ? " active" : ""}`}
-            onClick={() => onChange(t.view)}
-          >
-            <Icon name={t.icon} />
-            {t.label}
-          </button>
-        ))}
+          );
+        })}
       </nav>
-    </>
+
+      <WalletMenu chain={chain} />
+    </header>
   );
 }

@@ -1,18 +1,19 @@
 import Head from "next/head";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AboutView } from "../components/AboutView";
-import { AnchorView } from "../components/AnchorView";
+import { AnchorView, type AnchoredImage } from "../components/AnchorView";
 import { CursorFollower } from "../components/CursorFollower";
+import { HomeView } from "../components/HomeView";
 import { IntroBanner } from "../components/IntroBanner";
 import { NavBar, type View } from "../components/NavBar";
 import { SocialView } from "../components/SocialView";
 import { Toast, type ToastData } from "../components/Toast";
 import { WelcomeModal } from "../components/WelcomeModal";
 import { useChain } from "../lib/chain/useChain";
+import type { FeedPost } from "../lib/feed";
 import { lsGet, lsSet } from "../lib/storage";
 
-const MODAL_KEY = "origina_modal_v2";
-const bannerKey = (page: BannerPage) => `origina_banner_v2_${page}`;
+const MODAL_KEY = "origina_modal_v3";
+const bannerKey = (page: BannerPage) => `origina_banner_v3_${page}`;
 
 type BannerPage = "anchor" | "social";
 
@@ -28,18 +29,50 @@ const BANNERS: Record<BannerPage, JSX.Element> = {
   social: (
     <>
       <strong>Platform view.</strong> Posts carrying an Origina badge have a provenance record — click
-      the badge to inspect it. To check your own image, upload it under &quot;Add to feed&quot; below; it
-      is looked up on-chain, no wallet needed.
+      the badge to see which model made the image and open its Solana record. Images you anchor appear at
+      the top of the feed.
     </>
   ),
 };
 
+/** A post for an image anchored in this session. Read-only, like the rest of the feed. */
+function anchoredPost(image: AnchoredImage): FeedPost {
+  const { record, recordUrl, transactionUrl, providerName } = image.result;
+  return {
+    id: `anchored-${record.file_hash}`,
+    name: "You",
+    handle: "@you",
+    time: "now",
+    avatar: "#1D9E75",
+    following: false,
+    text: "",
+    imgUrl: image.imageUrl,
+    likes: 0,
+    reposts: 0,
+    replies: 0,
+    provenance: {
+      providerName,
+      provider: "origina",
+      sha256: record.file_hash,
+      creatorWallet: record.creator,
+      model: record.model,
+      slot: record.confirmed_slot ?? record.slot,
+      timestamp: null,
+      recordAddress: record.pda,
+      recordUrl,
+      signature: record.signature,
+      transactionUrl,
+    },
+  };
+}
+
 export default function Home() {
-  const [view, setView] = useState<View>("about");
+  const [view, setView] = useState<View>("home");
   const [modalOpen, setModalOpen] = useState(false);
   // null until localStorage has been read on the client, so nothing flashes during hydration
   const [dismissed, setDismissed] = useState<Record<BannerPage, boolean> | null>(null);
   const [toast, setToast] = useState<ToastData | null>(null);
+  const [anchoredPosts, setAnchoredPosts] = useState<FeedPost[]>([]);
   const chain = useChain();
   const toastId = useRef(0);
 
@@ -61,13 +94,19 @@ export default function Home() {
   function closeModal(dontShowAgain: boolean) {
     if (dontShowAgain) lsSet(MODAL_KEY, "1");
     setModalOpen(false);
-    showToast("👋 Start on the About page for a full overview", undefined, "about");
+    showToast("👋 Start on the Home page for a full overview", undefined, "home");
   }
 
   function dismissBanner(page: BannerPage) {
     lsSet(bannerKey(page), "1");
     setDismissed((d) => (d ? { ...d, [page]: true } : d));
   }
+
+  const addAnchored = useCallback((image: AnchoredImage) => {
+    setAnchoredPosts((prev) =>
+      prev.some((p) => p.id === `anchored-${image.result.record.file_hash}`) ? prev : [anchoredPost(image), ...prev],
+    );
+  }, []);
 
   const banner = (page: BannerPage) =>
     dismissed && !dismissed[page] ? (
@@ -93,16 +132,21 @@ export default function Home() {
 
       <main className="container">
         {/* All pages stay mounted so in-progress work and the feed survive tab switches. */}
-        <section className="page" hidden={view !== "about"}>
-          <AboutView />
+        <section className="page" hidden={view !== "home"}>
+          <HomeView onGoAnchor={() => changeView("anchor")} />
         </section>
         <section className="page" hidden={view !== "anchor"}>
           {banner("anchor")}
-          <AnchorView client={chain.client} chain={chain} onGoSocial={() => changeView("social")} />
+          <AnchorView
+            client={chain.client}
+            chain={chain}
+            onGoSocial={() => changeView("social")}
+            onAnchored={addAnchored}
+          />
         </section>
         <section className="page" hidden={view !== "social"}>
           {banner("social")}
-          <SocialView client={chain.client} onToast={showToast} />
+          <SocialView anchoredPosts={anchoredPosts} onToast={showToast} />
         </section>
       </main>
     </>

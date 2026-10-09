@@ -4,7 +4,7 @@ import { CLUSTER } from "../lib/chain/config";
 import { describeChainError } from "../lib/chain/errors";
 import type { ChainState } from "../lib/chain/useChain";
 import { describeFile, truncateAddress, truncateHash } from "../lib/format";
-import { MAX_MODEL_LENGTH, MODEL_OPTIONS, OTHER_MODEL, normalizeModel } from "../lib/models";
+import { MAX_MODEL_LENGTH, normalizeModel } from "../lib/models";
 import type { AnchorResult, OriginaClient } from "../lib/originaClient";
 import type { ProvenanceRecordData } from "../lib/provenance";
 import { Icon } from "./Icon";
@@ -21,14 +21,22 @@ const formatSol = (lamports: number | bigint) => {
 
 type Status = "idle" | "working" | "done";
 
+/** What the Social feed needs to show an image anchored in this session. */
+export interface AnchoredImage {
+  imageUrl: string;
+  result: AnchorResult;
+}
+
 export function AnchorView({
   client,
   chain,
   onGoSocial,
+  onAnchored,
 }: {
   client: OriginaClient;
   chain: ChainState;
   onGoSocial: () => void;
+  onAnchored: (image: AnchoredImage) => void;
 }) {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [fileLabel, setFileLabel] = useState("");
@@ -39,8 +47,8 @@ export function AnchorView({
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AnchorResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [modelChoice, setModelChoice] = useState("");
-  const [customModel, setCustomModel] = useState("");
+  const [modelText, setModelText] = useState("");
+  const [fileType, setFileType] = useState("image/png");
   const [anchorStatus, setAnchorStatus] = useState<AnchorStatus | null>(null);
   /** The connected wallet's SOL balance in lamports (null while unknown). */
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -74,7 +82,8 @@ export function AnchorView({
   const insufficient = !!payingWallet && !!cost && balance !== null && balance < BigInt(cost.requiredLamports);
   const originaCannotPay = !payingWallet && anchorStatus?.ready === true && anchorStatus.originaPays === false;
 
-  const model = modelChoice === OTHER_MODEL ? normalizeModel(customModel) : modelChoice || null;
+  const model = normalizeModel(modelText);
+  const modelInvalid = modelText.trim().length > 0 && !model;
   const unavailable = anchorStatus !== null && !anchorStatus.ready;
   const canAnchor = !!record && !analysing && !!model && !unavailable && !insufficient && !originaCannotPay;
   const stage = status === "done" ? 4 : !bytes ? 1 : analysing ? 2 : 3;
@@ -89,6 +98,7 @@ export function AnchorView({
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       setBytes(data);
+      setFileType(file.type || "image/png");
       setFileLabel(describeFile(file, data));
       setPreview(URL.createObjectURL(file));
       const extracted = await client.analyse(data);
@@ -109,8 +119,13 @@ export function AnchorView({
     setResult(null);
     setError(null);
     try {
-      setResult(await client.anchor({ record, model }));
+      const anchored = await client.anchor({ record, model });
+      setResult(anchored);
       setStatus("done");
+      // The feed gets its own copy of the image, so it outlives replacing the one in this page.
+      if (bytes) {
+        onAnchored({ imageUrl: URL.createObjectURL(new Blob([bytes.slice()], { type: fileType })), result: anchored });
+      }
       refreshBalance();
     } catch (err) {
       setError(describeChainError(err));
@@ -124,6 +139,9 @@ export function AnchorView({
     <>
       <h1 className="page-title">Anchor AI media</h1>
       <p className="page-sub">Stamp your AI-generated image with a permanent on-chain fingerprint.</p>
+      <button type="button" className="next-link social-jump" onClick={onGoSocial}>
+        Test provenance on the Social page <Icon name="arrow" />
+      </button>
 
       <div className="progress">
         {STEPS.map((label, i) => {
@@ -164,31 +182,33 @@ export function AnchorView({
         )}
 
         <div className={`reveal${bytes ? " open" : ""}`}>
-          <label className="field-label" htmlFor="model-select">
+          <label className="field-label" htmlFor="model-input">
             AI model used to generate this image
           </label>
-          <select id="model-select" value={modelChoice} onChange={(e) => setModelChoice(e.target.value)}>
-            <option value="" disabled>
-              Select a model…
-            </option>
-            {MODEL_OPTIONS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-            <option value={OTHER_MODEL}>{OTHER_MODEL}</option>
-          </select>
-          {modelChoice === OTHER_MODEL && (
-            <input
-              type="text"
-              value={customModel}
-              maxLength={MAX_MODEL_LENGTH}
-              placeholder="Model name"
-              aria-label="Model name"
-              style={{ marginTop: 8 }}
-              onChange={(e) => setCustomModel(e.target.value)}
-            />
+          <input
+            type="text"
+            id="model-input"
+            value={modelText}
+            maxLength={MAX_MODEL_LENGTH}
+            placeholder="Type the model's name, e.g. midjourney-v6"
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={modelInvalid}
+            onChange={(e) => setModelText(e.target.value)}
+          />
+          {modelInvalid && (
+            <div className="error-text">Use letters, numbers and . _ + - / only (up to {MAX_MODEL_LENGTH} characters).</div>
           )}
+
+          <div className="honesty-note">
+            <div className="honesty-label">A note from Origina</div>
+            <p>
+              This demo is built on trust. Origina is a provenance protocol — it records what you tell it. For this
+              proof of concept to produce meaningful data, please only upload images that were genuinely generated by
+              an AI tool, and enter the actual model used to create them. Anchoring false information defeats the
+              purpose of the protocol and pollutes the provenance record. We are trusting you to be honest.
+            </p>
+          </div>
 
           <label className="field-label" style={{ marginTop: 14 }}>
             Your wallet (optional)

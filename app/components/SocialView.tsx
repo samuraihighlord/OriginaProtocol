@@ -1,18 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { describeChainError } from "../lib/chain/errors";
-import { describeFile } from "../lib/format";
+import { useCallback, useState } from "react";
 import { FEED_POSTS, type FeedPost } from "../lib/feed";
-import type { OriginaClient } from "../lib/originaClient";
 import { Icon } from "./Icon";
-import { ImageDropzone } from "./ImageDropzone";
 import { ProvenanceDrawer } from "./ProvenanceDrawer";
 
-type FeedTab = "foryou" | "following" | "verified";
+type FeedTab = "foryou" | "verified";
 type Interaction = { liked?: boolean; reposted?: boolean };
 
 const TABS: { id: FeedTab; label: string }[] = [
   { id: "foryou", label: "For You" },
-  { id: "following", label: "Following" },
   { id: "verified", label: "Origina Verified" },
 ];
 
@@ -29,7 +24,6 @@ function PostCard({
   onOpenProvenance: (post: FeedPost) => void;
   onUnavailable: (what: string) => void;
 }) {
-  const near = post.provenance?.matchType === "near";
   return (
     <article className="post">
       <div className="avatar" style={{ background: post.avatar }}>
@@ -50,12 +44,12 @@ function PostCard({
           {post.provenance && (
             <button
               type="button"
-              className={`prov-badge${near ? " near" : ""}`}
+              className="prov-badge"
               aria-label="View provenance record"
               onClick={() => onOpenProvenance(post)}
             >
               <span className="mini-mark">O</span>
-              {near ? "AI-generated · modified" : "AI-generated"}
+              AI-generated
             </button>
           )}
         </div>
@@ -92,146 +86,48 @@ function PostCard({
 }
 
 export function SocialView({
-  client,
+  anchoredPosts,
   onToast,
 }: {
-  client: OriginaClient;
+  /** Images anchored in this session, newest first; they join the feed read-only. */
+  anchoredPosts: FeedPost[];
   onToast: (message: string, duration?: number) => void;
 }) {
   const [feedTab, setFeedTab] = useState<FeedTab>("foryou");
-  const [userPosts, setUserPosts] = useState<FeedPost[]>([]);
   const [interactions, setInteractions] = useState<Record<string, Interaction>>({});
   const [openPost, setOpenPost] = useState<FeedPost | null>(null);
 
-  const [bytes, setBytes] = useState<Uint8Array | null>(null);
-  const [fileLabel, setFileLabel] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [caption, setCaption] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [flash, setFlash] = useState(false);
-
-  const feedRef = useRef<HTMLDivElement>(null);
-  const composerRef = useRef<HTMLDivElement>(null);
-  const nextId = useRef(1);
-  const urls = useRef<string[]>([]);
-
-  useEffect(() => {
-    const created = urls.current;
-    return () => created.forEach((u) => URL.revokeObjectURL(u));
-  }, []);
-
   const closeDrawer = useCallback(() => setOpenPost(null), []);
 
-  const posts = [...userPosts, ...FEED_POSTS].filter((p) => {
-    if (feedTab === "verified") return !!p.provenance;
-    if (feedTab === "following") return p.following;
-    return true;
-  });
+  // hasOrigina is "this post carries a provenance record".
+  const posts = [...anchoredPosts, ...FEED_POSTS].filter((p) => feedTab === "foryou" || !!p.provenance);
 
   function toggle(id: string, key: "liked" | "reposted") {
     setInteractions((prev) => ({ ...prev, [id]: { ...prev[id], [key]: !prev[id]?.[key] } }));
   }
 
-  async function handleFile(file: File) {
-    const data = new Uint8Array(await file.arrayBuffer());
-    if (preview) URL.revokeObjectURL(preview);
-    const url = URL.createObjectURL(file);
-    urls.current.push(url);
-    setBytes(data);
-    setFileLabel(describeFile(file, data));
-    setPreview(url);
-  }
-
-  async function handlePost() {
-    if (!bytes || !preview) return;
-    setPosting(true);
-    setError(null);
-    try {
-      const match = await client.verify({ fileData: bytes });
-      const post: FeedPost = {
-        id: `u${nextId.current++}`,
-        name: "You",
-        handle: "@you",
-        time: "now",
-        avatar: "#1D9E75",
-        following: false,
-        text: caption.trim(),
-        imgUrl: preview,
-        likes: 0,
-        reposts: 0,
-        replies: 0,
-        provenance: match.found
-          ? {
-              providerName: match.providerName,
-              provider: match.provider ?? "",
-              sha256: match.sha256 ?? "",
-              creatorWallet: match.creatorWallet,
-              model: match.model,
-              slot: match.slot,
-              timestamp: match.timestamp,
-              recordAddress: match.recordAddress,
-              recordUrl: match.recordUrl,
-              matchType: match.exactMatch ? "exact" : "near",
-              distance: match.pHashDistance ?? undefined,
-            }
-          : undefined,
-      };
-      setUserPosts((p) => [post, ...p]);
-
-      // The feed post now owns this object URL, so just detach it from the composer.
-      setBytes(null);
-      setPreview(null);
-      setCaption("");
-
-      if (feedTab === "following" || (feedTab === "verified" && !post.provenance)) setFeedTab("foryou");
-      setTimeout(() => feedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-      onToast(
-        match.exactMatch
-          ? "Exact match — this image has an Origina record on Solana."
-          : match.nearMatch
-          ? "Near match — this looks like a modified anchored image."
-          : "No Origina record found on-chain for this image.",
-        3500
-      );
-    } catch (err) {
-      setError(`Could not verify this file: ${describeChainError(err)}`);
-    } finally {
-      setPosting(false);
-    }
-  }
-
-  function jumpToComposer() {
-    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setFlash(false);
-    setTimeout(() => setFlash(true), 0);
-  }
-
   return (
     <>
-      <div className="glass" style={{ padding: "0 12px" }}>
-        <div className="feed-tabs" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={feedTab === t.id}
-              className={`feed-tab${feedTab === t.id ? " active" : ""}`}
-              onClick={() => setFeedTab(t.id)}
-            >
-              {t.id === "verified" && <span className="mini-mark">O</span>}
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="feed-toolbar">
-          <button type="button" className="btn btn-subtle" onClick={jumpToComposer}>
-            <Icon name="upload" />
-            Add an image to the feed
-          </button>
-        </div>
-        <div className="feed" ref={feedRef}>
+      <div className="glass social">
+        <header className="social-head">
+          <h1 className="social-title glow-text">Social</h1>
+          <div className="social-tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={feedTab === t.id}
+                className={`social-tab${feedTab === t.id ? " active" : ""}`}
+                onClick={() => setFeedTab(t.id)}
+              >
+                <span className="social-tab-label">{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <div className="feed">
           {posts.map((p) => (
             <PostCard
               key={p.id}
@@ -242,43 +138,8 @@ export function SocialView({
               onUnavailable={(what) => onToast(`${what} aren't available yet.`, 2500)}
             />
           ))}
+          {posts.length === 0 && <p className="feed-empty">No posts to show.</p>}
         </div>
-      </div>
-
-      <div
-        className={`glass composer${flash ? " flash" : ""}`}
-        ref={composerRef}
-        onAnimationEnd={() => setFlash(false)}
-      >
-        <h2>Add to feed</h2>
-        <p className="sub">Post an image and it&apos;s checked against the on-chain Origina records — a match earns the badge. No wallet needed.</p>
-        <ImageDropzone title="Drop an image here" preview={preview} onFile={handleFile} onError={setError} />
-        {bytes && <div className="file-meta">{fileLabel}</div>}
-        {error && <div className="error-text">{error}</div>}
-        <div style={{ marginTop: 14 }}>
-          <label className="field-label" htmlFor="social-caption">
-            Caption
-          </label>
-          <input
-            type="text"
-            id="social-caption"
-            placeholder="What's happening?"
-            autoComplete="off"
-            maxLength={280}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-          />
-        </div>
-        <button type="button" className="btn btn-primary btn-block" disabled={!bytes || posting} onClick={handlePost}>
-          {posting ? (
-            <>
-              <span className="spinner" />
-              Verifying…
-            </>
-          ) : (
-            "Post"
-          )}
-        </button>
       </div>
 
       {openPost?.provenance && <ProvenanceDrawer provenance={openPost.provenance} onClose={closeDrawer} />}
