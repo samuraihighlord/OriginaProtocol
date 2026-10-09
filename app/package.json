@@ -9,6 +9,7 @@
     "lint": "next lint",
     "generate:client": "node scripts/generate-client.mjs",
     "setup:local": "tsx scripts/local-setup.ts",
+    "claim:provider": "tsx scripts/claim-provider.ts",
     "test:chain": "tsx scripts/chain-integration.ts"
   },
   "dependencies": {
