@@ -9,8 +9,8 @@ skip-lint = false
 origina = "8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi"
 
 [provider]
-cluster = "localnet"
-wallet = "~/.config/solana/id.json"
+cluster = "devnet"
+wallet = "~/.config/solana/origina.json"
 
 [scripts]
 test = "cargo test"

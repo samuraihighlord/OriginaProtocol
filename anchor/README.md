@@ -10,6 +10,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 - [Accounts](#accounts)
 - [Instructions](#instructions)
 - [Revocation model](#revocation-model)
+- [Creator wallet](#creator-wallet)
 - [Build, Test, and Deploy](#build-test-and-deploy)
 - [Program ID](#program-id)
 
@@ -17,7 +18,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 1. The registry authority approves providers after verifying their C2PA signing certificate off-chain.
 2. An approved provider claims its registration by signing with its own key.
 3. The provider anchors media at the point of generation. One on-chain record per file. A creator wallet is attached if that wallet also signs the transaction.
-4. To verify, the record address of a hashed file is derived and fetched.
+4. To verify, the record address of a hashed file is derived from the provider’s key and the file’s SHA-256 and fetched. It can also be fetched by looking up the hash via an indexer of `MediaAnchored` events.
 5. Providers can be revoked by the authority or by themselves. Revocation is permanent. The revocation record remains.
 
 ## Accounts
@@ -43,7 +44,7 @@ Approved providers anchor records of each generated image on-chain with a SHA-25
 | `self_revoke_provider`      | Provider                  | Revokes the provider account with `Voluntary` or `KeyCompromised`.           |
 | `anchor_media`              | Provider   (+ optional creator)               | Creates a provenance record. A co-signing creator's wallet is stored on the record.                                                |
 
-Every instruction emits an event. `anchor_media` uses CPI events (`emit_cpi!`), which are stored in instruction data to prevent data loss from log-based events.
+Every instruction emits an event. `anchor_media` uses CPI events (`emit_cpi!`), stored in instruction data, which is less likely to be truncated than logs.
 
 ## Revocation model
 Revocation **never rewrites history**. Records are never deleted or modified. Verifiers can compare a record's `slot` to the provider's `revocation.slot`. Records anchored before the revocation remain valid, except under `KeyCompromised`, where records shortly before it may be fraudulent. Records in the same slot as the revocation should be treated as suspect. No records can be anchored after revocation.
@@ -64,10 +65,16 @@ Deploy to devnet:
 ```bash
 anchor deploy --provider.cluster devnet
 ```
-Run `init_registry` immediately after deploying, signed by the deploying wallet (the upgrade authority). Verify with:
+Run from `anchor/`. After deploying, initialize the registry with `anchor migrate`, signed by the program's upgrade authority. Verify with:
 ```bash
 solana program show 8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi --url devnet
 ```
 
 ## Program ID
 8n7frgF7141JQnvUVtqxXid6RoZbfv7J7mrxQ9hnTFbi
+
+## Registry PDA
+Ci7xJohTjPHTmeFrhNUDvMjFC2iU8oxDVRTJJnkUwfjM
+
+## Registry Authority and Upgrade Authority
+7JxCwSgyZ9JVL8ZQ8SsXNzBsmAjJ5FP88LUGuBDGAknN
