@@ -254,7 +254,7 @@ async function main() {
   const active = await chain.getProviderStatus(rpc, origina.address);
   check("claim_provider activates Origina", active.kind === "active" && active.name === "Origina");
   const status3 = await getAnchorStatus("s3");
-  check("status: ready once registered, claimed and funded", status3.ready && status3.provider === origina.address && status3.originaPays === true);
+  check("status: ready once registered, claimed and funded", status3.ready && status3.provider === origina.address);
   const rent = BigInt(await rpc.getMinimumBalanceForRentExemption(BigInt(chain.PROVENANCE_RECORD_ACCOUNT_SIZE)).send());
   check("status reports what an anchor costs the paying wallet", status3.cost?.rentLamports === Number(rent) && status3.cost.feeLamports === 10_000 && status3.cost.requiredLamports > Number(rent) + 10_000, JSON.stringify(status3.cost));
 
@@ -341,17 +341,13 @@ async function main() {
   const noC2paRecord = await chain.getRecord(rpc, address(noC2paResult.recordAddress));
   check("with no C2PA manifest the record stores the 'no manifest' sentinel", noC2paRecord?.c2paManifestHashHex === bytesHex(await noC2paManifestHash()));
 
-  // ---- anchoring with no wallet connected ----
+  // ---- anchoring needs a connected wallet ----
   const imgAnon = await fingerprint("anonymous-image");
-  const anonPrep = await prepared(imgAnon, null, "t4c");
-  check("with no creator there is nothing for a wallet to sign", anonPrep.transaction === null);
-  const anonBefore = (await rpc.getBalance(origina.address).send()).value;
-  const anon = await submitAnchor(fields(imgAnon, null), "t4c");
-  const anonAfter = (await rpc.getBalance(origina.address).send()).value;
-  const anonRecord = await chain.getRecord(rpc, address(anon.recordAddress));
-  check("a wallet-less anchor lands with creator_wallet = null", !!anonRecord && anonRecord.creatorWallet === null && anonRecord.provider === origina.address);
-  check("with no wallet, Origina pays the rent and fee itself", anonBefore - anonAfter === rent + 5_000n, `${anonBefore - anonAfter} lamports`);
-  await expectApiError("an anchor that names a creator but sends no transaction is refused", async () => submitAnchor(fields(await fingerprint("x1"), judge), "t4c"), 400, /transaction/);
+  await expectApiError("prepare without a wallet is refused (400)", () => prepareAnchor(fields(imgAnon, null), "t4c"), 400, /Connect a wallet/);
+  await expectApiError("submit without a wallet is refused (400)", () => submitAnchor({ ...fields(imgAnon, null), transaction: getBase64EncodedWireTransaction(signedByWallet) }, "t4c"), 400, /Connect a wallet/);
+  await expectApiError("an empty wallet field is refused too (400)", () => prepareAnchor(fields(imgAnon, null, { creator: "" }), "t4c"), 400, /Connect a wallet/);
+  check("a refused wallet-less request created no record", (await chain.findExistingRecord(rpc, origina.address, imgAnon.sha)).record === null);
+  await expectApiError("an anchor that names a wallet but sends no transaction is refused", async () => submitAnchor({ ...fields(await fingerprint("x1"), judge), transaction: "" }, "t4c"), 400, /transaction/);
 
   // ---- duplicates ----
   const again = await prepareAnchor(fields(img, judge2), "t5");
@@ -404,9 +400,9 @@ async function main() {
     const second = await app.anchor({ record: draft, model: "Midjourney" });
     check("anchoring again reports 'already anchored' and keeps the original model", second.alreadyAnchored && second.record.model === "Stable Diffusion XL" && second.record.signature === null);
     check("an already-anchored result names who anchored first and when", second.existing?.creator === judge.address && (second.existing?.anchoredAt ?? 0) > 1_600_000_000 && first.existing === null);
-    const stranger = new OriginaClient({ rpc, signer: null });
+    const stranger = new OriginaClient({ rpc, signer: modifyingWallet(judge2) });
     const strangerResult = await stranger.anchor({ record: await stranger.analyse(data), model: "Flux" });
-    check("a different (or no) wallet anchoring the same file gets the original record, naming the original creator", strangerResult.alreadyAnchored && strangerResult.existing?.creator === judge.address && strangerResult.record.pda === first.record.pda && strangerResult.record.signature === null);
+    check("a different wallet anchoring the same file gets the original record, naming the original creator", strangerResult.alreadyAnchored && strangerResult.existing?.creator === judge.address && strangerResult.record.pda === first.record.pda && strangerResult.record.signature === null);
     const verified = await app.verify({ fileData: data });
     check("OriginaClient.verify finds it, with provider, creator and model", verified.exactMatch && verified.providerName === "Origina" && verified.creatorWallet === judge.address && verified.model === "Stable Diffusion XL");
     await app.anchor({ record: draft, model: "" }).then(
@@ -414,17 +410,23 @@ async function main() {
       (e: Error) => check("the client refuses an empty model", /model/i.test(e.message)),
     );
 
-    // No wallet connected: the creator is null and nothing is asked of a wallet.
+    // No wallet connected: refused before anything is sent anywhere.
     const lone = new OriginaClient({ rpc, signer: null });
     const loneDraft = await lone.analyse(new TextEncoder().encode("no-wallet-image".repeat(200)));
-    const loneResult = await lone.anchor({ record: loneDraft, model: "Flux" });
-    check("with no wallet connected the stored creator is null", !loneResult.alreadyAnchored && loneResult.record.creator === null && recordStore.get(loneDraft.file_hash)?.creator === null);
+    await lone.anchor({ record: loneDraft, model: "Flux" }).then(
+      () => check("the client refuses to anchor with no wallet connected", false),
+      (e: Error) => check("the client refuses to anchor with no wallet connected", /Connect a wallet/.test(e.message)),
+    );
+    check("nothing was recorded for the refused attempt", !recordStore.has(loneDraft.file_hash) && (await chain.findExistingRecord(rpc, origina.address, loneDraft.file_hash)).record === null);
 
-    // A wallet that can only sign-and-send cannot co-sign: anchored without a creator instead of failing.
+    // A wallet that can only sign-and-send cannot co-sign: refused with an explanation.
     const sendOnly = { address: judge2.address, signAndSendTransactions: async () => [] } as unknown as TransactionSigner;
     const degraded = new OriginaClient({ rpc, signer: sendOnly });
-    const degradedResult = await degraded.anchor({ record: await degraded.analyse(new TextEncoder().encode("send-only-wallet".repeat(200))), model: "Flux" });
-    check("a wallet that cannot co-sign still anchors, without a creator", degradedResult.record.creator === null && degradedResult.creatorSkipped);
+    const degradedDraft = await degraded.analyse(new TextEncoder().encode("send-only-wallet".repeat(200)));
+    await degraded.anchor({ record: degradedDraft, model: "Flux" }).then(
+      () => check("a wallet that cannot co-sign is refused", false),
+      (e: Error) => check("a wallet that cannot co-sign is refused with an explanation", /sign and send/.test(e.message)),
+    );
 
     // A wallet that implements only the partial-signer interface works too.
     const viaPartial = await anchorWithOrigina(judge2, fields(await fingerprint("partial-path"), judge2, { perceptual_hash: "0x0000000000000abc" }) as never);
@@ -531,14 +533,6 @@ async function main() {
   // ---- abuse limits ----
   for (let i = 0; i < 60; i++) await prepareAnchor(fields(img, judge), "burst");
   await expectApiError("the 61st prepare in an hour from one address is rate-limited (429)", () => prepareAnchor(fields(img, judge), "burst"), 429);
-
-  process.env.ORIGINA_RESERVE_LAMPORTS = String(10n ** 15n);
-  await expectApiError("wallet-less anchoring pauses (503) when Origina's wallet is below its reserve", async () => prepareAnchor(fields(await fingerprint("poor"), null), "t8"), 503, /out of devnet SOL/);
-  const lowTx = await prepareAnchor(fields(await fingerprint("poor-but-user-pays"), judge), "t8");
-  check("a paying wallet can still anchor when Origina's own balance is low", !lowTx.alreadyAnchored && !!lowTx.transaction);
-  const lowStatus = await getAnchorStatus("s4");
-  check("status: registry is ready but Origina can't pay for wallet-less anchors", lowStatus.ready && lowStatus.originaPays === false);
-  delete process.env.ORIGINA_RESERVE_LAMPORTS;
 
   // ---- revocation ----
   await dc.sendTransaction([await getRevokeProviderInstructionAsync({ authority: deployer, provider: origina.address, reason: RevocationReason.Policy })]);

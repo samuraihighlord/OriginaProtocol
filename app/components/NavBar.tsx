@@ -80,7 +80,7 @@ function WalletMenu({ chain }: { chain: ChainState }) {
             </>
           ) : (
             <>
-              <p>Connect a Solana wallet to be recorded as the creator of an anchored image. It pays the small devnet SOL deposit and fee. Anchoring and checking an image also work without one.</p>
+              <p>Connect a Solana wallet to anchor an image. It is recorded as the creator and pays the small devnet SOL deposit and fee.</p>
               <WalletList chain={chain} />
               {walletError && <div className="error-text">{walletError}</div>}
             </>

@@ -37,11 +37,11 @@ function transferData(lamports: bigint): Uint8Array {
 export interface AnchorTxInput {
   provider: Address;
   /**
-   * The wallet that co-signs as creator, or null to record no creator. A creator also pays: it is the transaction's
-   * fee payer and reimburses Origina for the record's rent. With no creator, Origina is the fee payer and pays.
+   * The connected wallet. It co-signs as creator and pays: it is the transaction's fee payer and reimburses
+   * Origina for the record's rent.
    */
-  creator: Address | null;
-  /** The record account's rent-exempt deposit; the creator sends exactly this to Origina. Required with a creator. */
+  creator: Address;
+  /** The record account's rent-exempt deposit; the creator sends exactly this to Origina. */
   rentLamports: bigint;
   fileHashHex: string;
   phash: bigint;
@@ -61,7 +61,7 @@ export async function buildAnchorInstructions(input: AnchorTxInput) {
   const perceptual = packPerceptualHash(input.phash);
   const anchorIx = await getAnchorMediaInstructionAsync({
     provider: createNoopSigner(input.provider),
-    ...(input.creator ? { creator: createNoopSigner(input.creator) } : {}),
+    creator: createNoopSigner(input.creator),
     eventAuthority: await eventAuthority(),
     program: ORIGINA_PROGRAM_ADDRESS,
     fileSha256: hexToBytes(input.fileHashHex),
@@ -77,16 +77,14 @@ export async function buildAnchorInstructions(input: AnchorTxInput) {
   };
   // Origina fronts the record's rent inside the program (the program charges the provider); the creator pays it
   // back in the same transaction, ahead of anchor_media, so Origina ends up exactly where it started.
-  const reimburseIx: Instruction | null = input.creator
-    ? {
-        programAddress: SYSTEM_PROGRAM_ADDRESS,
-        accounts: [
-          { address: input.creator, role: AccountRole.WRITABLE_SIGNER, signer: createNoopSigner(input.creator) },
-          { address: input.provider, role: AccountRole.WRITABLE },
-        ] as never,
-        data: transferData(input.rentLamports),
-      }
-    : null;
+  const reimburseIx: Instruction = {
+    programAddress: SYSTEM_PROGRAM_ADDRESS,
+    accounts: [
+      { address: input.creator, role: AccountRole.WRITABLE_SIGNER, signer: createNoopSigner(input.creator) },
+      { address: input.provider, role: AccountRole.WRITABLE },
+    ] as never,
+    data: transferData(input.rentLamports),
+  };
   return { reimburseIx, anchorIx, memoIx };
 }
 
@@ -99,10 +97,10 @@ export async function buildAnchorInstructions(input: AnchorTxInput) {
  */
 export async function buildAnchorTransaction(input: AnchorTxInput) {
   const { reimburseIx, anchorIx, memoIx } = await buildAnchorInstructions(input);
-  const instructions = reimburseIx ? [reimburseIx, anchorIx, memoIx] : [anchorIx, memoIx];
+  const instructions = [reimburseIx, anchorIx, memoIx];
   const message = pipe(
     createTransactionMessage({ version: 0 }),
-    (m) => setTransactionMessageFeePayerSigner(createNoopSigner(input.creator ?? input.provider), m),
+    (m) => setTransactionMessageFeePayerSigner(createNoopSigner(input.creator), m),
     // The block height is only used by senders that track expiry; the transaction bytes do not contain it.
     (m) => setTransactionMessageLifetimeUsingBlockhash({ blockhash: input.blockhash, lastValidBlockHeight: BigInt(0) }, m),
     (m) => appendTransactionMessageInstructions(instructions, m),

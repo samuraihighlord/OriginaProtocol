@@ -65,24 +65,20 @@ export type CosignOutcome =
   | { kind: "already-anchored"; recordAddress: Address; provider: Address };
 
 /**
- * Anchors a file through Origina. The server builds the transaction (Origina signs as the registered provider);
- * when a wallet is connected it signs first as the creator and pays (fee payer, plus reimbursing the rent), and the
- * server adds its signature last and submits. With no wallet the server signs and submits alone, paying itself, and
- * the record has no creator.
+ * Anchors a file through Origina. The server builds the transaction (Origina signs as the registered provider); the
+ * connected wallet signs first as the creator and pays (fee payer, plus reimbursing the rent), and the server adds
+ * its signature last and submits. A wallet is required: it is the creator and the payer.
  */
-export async function anchorWithOrigina(signer: TransactionSigner | null, fields: AnchorFields): Promise<CosignOutcome> {
-  if ((signer?.address ?? null) !== fields.creator) throw new Error("The creator must be the connected wallet.");
+export async function anchorWithOrigina(signer: TransactionSigner, fields: AnchorFields): Promise<CosignOutcome> {
+  if (signer.address !== fields.creator) throw new Error("The creator must be the connected wallet.");
 
   const prepared = await postJson<PrepareResponse>("/api/anchor/prepare", fields);
   const recordAddress = address(prepared.recordAddress);
   const provider = address(prepared.provider);
   if (prepared.alreadyAnchored) return { kind: "already-anchored", recordAddress, provider };
 
-  let transaction: string | null = null;
-  if (signer && prepared.transaction) {
-    const unsigned = getTransactionDecoder().decode(getBase64Encoder().encode(prepared.transaction));
-    transaction = getBase64EncodedWireTransaction(await signWithWallet(signer, unsigned));
-  }
+  const unsigned = getTransactionDecoder().decode(getBase64Encoder().encode(prepared.transaction));
+  const transaction = getBase64EncodedWireTransaction(await signWithWallet(signer, unsigned));
 
   const submitted = await postJson<SubmitResponse>("/api/anchor/submit", { ...fields, transaction });
   return { kind: "anchored", signature: submitted.signature, recordAddress, provider };

@@ -43,8 +43,6 @@ const SUBMIT_LIMIT = 20;
 const STATUS_LIMIT = 240;
 const HOUR_MS = 60 * 60 * 1000;
 
-/** When Origina itself pays (no wallet connected) it stops rather than draining its wallet to zero. */
-const DEFAULT_RESERVE_LAMPORTS = BigInt(10_000_000); // 0.01 SOL
 /** Two signatures at 5000 lamports each: the creator's and Origina's. */
 const NETWORK_FEE_LAMPORTS = BigInt(10_000);
 
@@ -66,7 +64,7 @@ interface ParsedFields {
   fileHashHex: string;
   phash: bigint;
   c2paManifestHashHex: string | null;
-  creator: Address | null;
+  creator: Address;
   slot: number;
   generatedAt: number;
   model: string;
@@ -82,7 +80,11 @@ function parseFields(body: unknown): ParsedFields {
   if (f.c2pa_manifest_hash !== null && f.c2pa_manifest_hash !== undefined && !isNonZeroHex32(f.c2pa_manifest_hash)) {
     throw new AnchorApiError(400, "That C2PA manifest hash isn't valid.");
   }
-  if (f.creator !== null && f.creator !== undefined && (typeof f.creator !== "string" || !isAddress(f.creator))) {
+  // Anchoring needs a connected wallet: it is the creator, and it pays.
+  if (f.creator === null || f.creator === undefined || f.creator === "") {
+    throw new AnchorApiError(400, "Connect a wallet to anchor an image.");
+  }
+  if (typeof f.creator !== "string" || !isAddress(f.creator)) {
     throw new AnchorApiError(400, "That wallet address isn't valid.");
   }
   if (!Number.isSafeInteger(f.slot) || (f.slot as number) < 0) throw new AnchorApiError(400, "That slot isn't valid.");
@@ -101,7 +103,7 @@ function parseFields(body: unknown): ParsedFields {
     fileHashHex: (f.file_hash as string).toLowerCase(),
     phash: BigInt(f.perceptual_hash as string),
     c2paManifestHashHex: f.c2pa_manifest_hash ? (f.c2pa_manifest_hash as string).toLowerCase() : null,
-    creator: f.creator ? address(f.creator as string) : null,
+    creator: address(f.creator as string),
     slot: f.slot as number,
     generatedAt: f.generated_at as number,
     model,
@@ -123,7 +125,6 @@ const MESSAGES: Record<AnchorUnavailableReason, string> = {
   "not-registered": "Anchoring isn't available yet: Origina's provider wallet hasn't been approved in the on-chain registry.",
   "not-claimed": "Anchoring isn't available yet: Origina's provider wallet was approved but hasn't claimed its registration.",
   revoked: "Anchoring is unavailable: Origina's provider registration has been revoked.",
-  "low-balance": "Anchoring without a wallet is paused: Origina's provider wallet is out of devnet SOL. Connect a wallet to pay for the anchor yourself, or try again later.",
   "insufficient-funds": "Your wallet doesn't have enough devnet SOL to anchor.",
   network: "Anchoring is temporarily unavailable: couldn't reach the Solana network. Please try again in a moment.",
 };
@@ -146,7 +147,7 @@ async function getCost(rpc: Rpc<SolanaRpcApi>): Promise<AnchorCost & { rent: big
 const SOL = 1_000_000_000;
 const sol = (lamports: number | bigint) => (Number(lamports) / SOL).toFixed(4);
 
-/** Is Origina's wallet configured and registered — and can it also pay itself? Reports why not; never throws on that. */
+/** Is Origina's wallet configured and registered? Reports why not; never throws on that. */
 export async function getAnchorStatus(ip: string): Promise<AnchorStatus> {
   checkRate("status", ip);
   try {
@@ -154,9 +155,8 @@ export async function getAnchorStatus(ip: string): Promise<AnchorStatus> {
     const rpc = getRpc();
     await ensureProviderRegistered(rpc, signer.address);
     const cost = await getCost(rpc);
-    const originaPays = await providerCanPay(rpc, signer.address, cost.rent).catch(() => false);
     const { rent: _rent, ...publicCost } = cost;
-    return { ready: true, provider: signer.address, originaPays, cost: publicCost };
+    return { ready: true, provider: signer.address, cost: publicCost };
   } catch (err) {
     if (err instanceof AnchorApiError && err.reason) {
       let provider: string | null = null;
@@ -181,53 +181,27 @@ async function ensureProviderRegistered(rpc: Rpc<SolanaRpcApi>, provider: Addres
   if (status.kind === "revoked") throw unavailable("revoked");
 }
 
-/** Can Origina's wallet pay for one more record itself, keeping its reserve? Only needed when no wallet pays. */
-async function providerCanPay(rpc: Rpc<SolanaRpcApi>, provider: Address, rent: bigint): Promise<boolean> {
-  const { value: balance } = await rpc.getBalance(provider).send();
-  const reserve = process.env.ORIGINA_RESERVE_LAMPORTS ? BigInt(process.env.ORIGINA_RESERVE_LAMPORTS) : DEFAULT_RESERVE_LAMPORTS;
-  return balance >= rent + NETWORK_FEE_LAMPORTS + reserve;
-}
-
 /**
- * Makes sure whoever pays for this anchor can: the creator's wallet when there is one (it pays the network fee and
- * reimburses the rent), otherwise Origina's. Fails with a message the person can act on.
+ * Makes sure the connected wallet can pay for this anchor: it is the transaction's fee payer and reimburses the
+ * record's rent. Fails with a message the person can act on, and returns the rent to reimburse.
  */
-async function ensureCanPay(rpc: Rpc<SolanaRpcApi>, provider: Address, creator: Address | null): Promise<bigint> {
+async function ensureCanPay(rpc: Rpc<SolanaRpcApi>, creator: Address): Promise<bigint> {
   let cost;
+  let balance: bigint;
   try {
     cost = await getCost(rpc);
+    balance = (await rpc.getBalance(creator).send()).value;
   } catch (err) {
-    console.error("Could not read the rent parameters:", err);
+    console.error("Could not read the rent parameters or the wallet's balance:", err);
     throw unavailable("network");
   }
-  if (creator) {
-    let balance: bigint;
-    try {
-      balance = (await rpc.getBalance(creator).send()).value;
-    } catch (err) {
-      console.error("Could not read the creator's balance:", err);
-      throw unavailable("network");
-    }
-    if (balance < BigInt(cost.requiredLamports)) {
-      throw new AnchorApiError(
-        400,
-        `Your wallet needs about ${sol(cost.requiredLamports)} devnet SOL to anchor (the record's ${sol(cost.rentLamports)} SOL deposit plus network fees) and has ${sol(balance)}. Get free devnet SOL at faucet.solana.com.`,
-        undefined,
-        "insufficient-funds",
-      );
-    }
-  } else {
-    let canPay = false;
-    try {
-      canPay = await providerCanPay(rpc, provider, cost.rent);
-    } catch (err) {
-      console.error("Could not read Origina's balance:", err);
-      throw unavailable("network");
-    }
-    if (!canPay) {
-      console.error(`Provider ${provider} is low on SOL; anchoring without a wallet is paused until it is topped up.`);
-      throw unavailable("low-balance");
-    }
+  if (balance < BigInt(cost.requiredLamports)) {
+    throw new AnchorApiError(
+      400,
+      `Your wallet needs about ${sol(cost.requiredLamports)} devnet SOL to anchor (the record's ${sol(cost.rentLamports)} SOL deposit plus network fees) and has ${sol(balance)}. Get free devnet SOL at faucet.solana.com.`,
+      undefined,
+      "insufficient-funds",
+    );
   }
   return cost.rent;
 }
@@ -252,8 +226,8 @@ async function txInput(fields: ParsedFields, provider: Address, blockhash: Block
 /* --------------------------------- prepare --------------------------------- */
 
 /**
- * Step 1. Reports whether the file is already anchored, and otherwise checks the payer can afford it and builds
- * the unsigned transaction for the creator's wallet to sign (there is nothing to sign when no wallet is connected).
+ * Step 1. Reports whether the file is already anchored, and otherwise checks the wallet can afford it and builds
+ * the unsigned transaction for the wallet to sign.
  */
 export async function prepareAnchor(body: unknown, ip: string): Promise<PrepareResponse> {
   checkRate("prepare", ip);
@@ -267,8 +241,7 @@ export async function prepareAnchor(body: unknown, ip: string): Promise<PrepareR
   if (record) return { alreadyAnchored: true, recordAddress, provider };
 
   await ensureProviderRegistered(rpc, provider);
-  const rent = await ensureCanPay(rpc, provider, fields.creator);
-  if (!fields.creator) return { alreadyAnchored: false, recordAddress, provider, transaction: null };
+  const rent = await ensureCanPay(rpc, fields.creator);
 
   const { value: latest } = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
   const transaction = await buildAnchorTransaction(await txInput(fields, provider, latest.blockhash, rent));
@@ -278,10 +251,9 @@ export async function prepareAnchor(body: unknown, ip: string): Promise<PrepareR
 /* --------------------------------- submit ---------------------------------- */
 
 /**
- * Step 2. With a creator: receives the transaction after the user's wallet (the fee payer, who also reimburses
- * the rent) has signed it, and adds Origina's signature only if what was signed is the transaction the server would
- * build (see validateSignedAnchorTransaction). Without one: builds, signs and sends the transaction itself, paying
- * for it. Then sends and waits for confirmation.
+ * Step 2. Receives the transaction after the user's wallet (the fee payer, who also reimburses the rent) has signed
+ * it, and adds Origina's signature only if what was signed is the transaction the server would build (see
+ * validateSignedAnchorTransaction). Then sends it and waits for confirmation.
  */
 export async function submitAnchor(body: unknown, ip: string): Promise<SubmitResponse> {
   checkRate("submit", ip);
@@ -291,40 +263,33 @@ export async function submitAnchor(body: unknown, ip: string): Promise<SubmitRes
   if (fields.creator === provider) throw new AnchorApiError(400, "That wallet address isn't valid.");
   const rpc = getRpc();
   await ensureProviderRegistered(rpc, provider);
-  const rent = await ensureCanPay(rpc, provider, fields.creator);
+  const rent = await ensureCanPay(rpc, fields.creator);
 
-  let toSend: Transaction;
-  if (fields.creator) {
-    const encoded = (body as Partial<SubmitRequest>).transaction;
-    if (typeof encoded !== "string" || encoded.length === 0 || encoded.length > MAX_TRANSACTION_BASE64_LENGTH) {
-      throw new AnchorApiError(400, "That transaction isn't valid.");
-    }
-    let submitted: Transaction;
-    let blockhash: Blockhash;
-    try {
-      submitted = getTransactionDecoder().decode(getBase64Encoder().encode(encoded));
-      blockhash = toBlockhash(getCompiledTransactionMessageDecoder().decode(submitted.messageBytes).lifetimeToken);
-    } catch {
-      throw new AnchorApiError(400, "That transaction isn't valid.");
-    }
-
-    const expected = await buildAnchorTransaction(await txInput(fields, provider, blockhash, rent));
-    validateSignedAnchorTransaction(expected.messageBytes, submitted.messageBytes, provider);
-
-    // The user must actually have signed (consented to being recorded as the creator).
-    const creatorSignature = submitted.signatures[fields.creator];
-    const creatorSigned =
-      creatorSignature && (await verifySignature(await getPublicKeyFromAddress(fields.creator), creatorSignature, submitted.messageBytes));
-    if (!creatorSigned) throw new AnchorApiError(400, "The transaction wasn't signed by your wallet.");
-    toSend = submitted;
-  } else {
-    const { value: latest } = await rpc.getLatestBlockhash({ commitment: "confirmed" }).send();
-    toSend = await buildAnchorTransaction(await txInput(fields, provider, latest.blockhash, rent));
+  const encoded = (body as Partial<SubmitRequest>).transaction;
+  if (typeof encoded !== "string" || encoded.length === 0 || encoded.length > MAX_TRANSACTION_BASE64_LENGTH) {
+    throw new AnchorApiError(400, "That transaction isn't valid.");
   }
+  let submitted: Transaction;
+  let blockhash: Blockhash;
+  try {
+    submitted = getTransactionDecoder().decode(getBase64Encoder().encode(encoded));
+    blockhash = toBlockhash(getCompiledTransactionMessageDecoder().decode(submitted.messageBytes).lifetimeToken);
+  } catch {
+    throw new AnchorApiError(400, "That transaction isn't valid.");
+  }
+
+  const expected = await buildAnchorTransaction(await txInput(fields, provider, blockhash, rent));
+  validateSignedAnchorTransaction(expected.messageBytes, submitted.messageBytes, provider);
+
+  // The user must actually have signed (consented to being recorded as the creator).
+  const creatorSignature = submitted.signatures[fields.creator];
+  const creatorSigned =
+    creatorSignature && (await verifySignature(await getPublicKeyFromAddress(fields.creator), creatorSignature, submitted.messageBytes));
+  if (!creatorSigned) throw new AnchorApiError(400, "The transaction wasn't signed by your wallet.");
+  const toSend: Transaction = submitted;
 
   const { recordAddress, record } = await findExistingRecord(rpc, provider, fields.fileHashHex);
   if (record) throw new AnchorApiError(409, "This file has already been anchored.");
-
   const providerSignature = await signBytes(providerSigner.keyPair.privateKey, toSend.messageBytes);
   const signed: Transaction = { ...toSend, signatures: { ...toSend.signatures, [provider]: providerSignature } };
   const signature = getSignatureFromTransaction(signed);

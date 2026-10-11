@@ -3,8 +3,8 @@
  * Solana types directly.
  *
  * - anchor(): fingerprints the file in the browser and writes a provenance record to the Origina program.
- *   Origina is the registered provider and signs the record. A connected wallet co-signs as the creator and pays:
- *   it is the transaction's fee payer and reimburses the record's rent. With no wallet, Origina pays.
+ *   Origina is the registered provider and signs the record. A connected wallet is required: it co-signs as the
+ *   creator and pays (it is the transaction's fee payer and reimburses the record's rent).
  * - verify(): fingerprints the file in the browser and looks it up on-chain (read-only; no wallet needed).
  *
  * The image itself is never sent anywhere — only its fingerprint goes on-chain.
@@ -36,12 +36,10 @@ export interface AnchorResult {
   /** True when Origina had already anchored this exact file (anchors are immutable). */
   alreadyAnchored: boolean;
   /**
-   * Set when alreadyAnchored: who the existing record names as creator (null = anchored without a wallet) and
-   * when it was anchored (unix seconds; the record's block time, else its generated_at).
+   * Set when alreadyAnchored: who the existing record names as creator and when it was anchored (unix seconds; the
+   * record's block time, else its generated_at).
    */
   existing: { creator: string | null; anchoredAt: number } | null;
-  /** True when a wallet was connected but couldn't co-sign, so the record has no creator. */
-  creatorSkipped: boolean;
 }
 
 export interface VerifyParams {
@@ -123,9 +121,12 @@ export class OriginaClient {
     const model = normalizeModel(params.model);
     if (!model) throw new Error("Choose the model that generated this image.");
 
-    // A wallet that can't sign without sending can't co-sign; anchor without a creator rather than failing.
-    const cosigner = signer && canCosign(signer) ? signer : null;
-    const creator = cosigner?.address ?? null;
+    // Anchoring needs a wallet, and one that can sign a transaction without sending it.
+    if (!signer) throw new Error("Connect a wallet to anchor an image.");
+    if (!canCosign(signer)) {
+      throw new Error("This wallet can only sign and send in one step, which Origina doesn't support. Try another wallet.");
+    }
+    const creator = signer.address;
 
     // The slot is read immediately before submitting.
     const slot = Number(await rpc.getSlot(CONFIRMED).send());
@@ -136,13 +137,13 @@ export class OriginaClient {
       file_hash: draft.file_hash,
       perceptual_hash: phashHex(draft.perceptual_hash),
       c2pa_manifest_hash: draft.c2pa_manifest_hash,
-      creator: draft.creator,
+      creator,
       slot,
       generated_at: draft.generated_at,
       bump: draft.bump,
       model,
     };
-    const outcome = await anchorWithOrigina(cosigner, fields);
+    const outcome = await anchorWithOrigina(signer, fields);
     knownProvider = outcome.provider;
 
     const onChain = await readRecordWhenVisible(rpc, outcome.recordAddress);
@@ -177,7 +178,6 @@ export class OriginaClient {
       existing: alreadyAnchored
         ? { creator: onChain.creatorWallet, anchoredAt: blockTime ?? record.generated_at }
         : null,
-      creatorSkipped: !!signer && !cosigner,
     };
   }
 

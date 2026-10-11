@@ -10,8 +10,8 @@ export interface AnchorFields {
   perceptual_hash: string;
   /** Hex SHA-256 of the embedded C2PA manifest, or null when there is none. */
   c2pa_manifest_hash: string | null;
-  /** The user's wallet (co-signs the transaction), or null when no wallet is connected. */
-  creator: string | null;
+  /** The connected wallet: it co-signs the transaction as creator and pays. Required. */
+  creator: string;
   /** Devnet slot the browser observed just before submitting. */
   slot: number;
   /** Unix seconds. */
@@ -29,13 +29,13 @@ export type PrepareResponse =
       recordAddress: string;
       /** Origina's provider wallet. */
       provider: string;
-      /** Base64 wire-format transaction for the creator's wallet to sign; null when there is no creator to co-sign. */
-      transaction: string | null;
+      /** Base64 wire-format transaction for the creator's wallet to sign. */
+      transaction: string;
     };
 
 export interface SubmitRequest extends AnchorFields {
-  /** Base64 wire-format transaction signed by the creator's wallet. Required when `creator` is set. */
-  transaction?: string | null;
+  /** Base64 wire-format transaction signed by the creator's wallet. */
+  transaction: string;
 }
 
 export interface SubmitResponse {
@@ -49,7 +49,6 @@ export type AnchorUnavailableReason =
   | "not-registered"
   | "not-claimed"
   | "revoked"
-  | "low-balance"
   | "insufficient-funds"
   | "network";
 
@@ -66,8 +65,6 @@ export interface AnchorCost {
 export interface AnchorStatus {
   /** The registry side is in order: Origina's wallet is configured, approved and claimed. */
   ready: boolean;
-  /** Origina can also pay for anchors itself (used when no wallet is connected). */
-  originaPays?: boolean;
   cost?: AnchorCost;
   /** Origina's provider wallet, when configured. */
   provider: string | null;

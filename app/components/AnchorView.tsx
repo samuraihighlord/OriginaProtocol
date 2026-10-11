@@ -67,7 +67,7 @@ export function AnchorView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A connected wallet that can sign pays for the anchor; otherwise Origina does (and records no creator).
+  // Anchoring needs a connected wallet that can sign: it is the creator, and it pays.
   const payingWallet = chain.address && !chain.walletCannotSign ? chain.address : null;
   const refreshBalance = () => {
     if (payingWallet) void client.getWalletBalance(payingWallet).then(setBalance);
@@ -80,12 +80,11 @@ export function AnchorView({
 
   const cost = anchorStatus?.cost;
   const insufficient = !!payingWallet && !!cost && balance !== null && balance < BigInt(cost.requiredLamports);
-  const originaCannotPay = !payingWallet && anchorStatus?.ready === true && anchorStatus.originaPays === false;
 
   const model = normalizeModel(modelText);
   const modelInvalid = modelText.trim().length > 0 && !model;
   const unavailable = anchorStatus !== null && !anchorStatus.ready;
-  const canAnchor = !!record && !analysing && !!model && !unavailable && !insufficient && !originaCannotPay;
+  const canAnchor = !!record && !analysing && !!model && !!payingWallet && !unavailable && !insufficient;
   const stage = status === "done" ? 4 : !bytes ? 1 : analysing ? 2 : 3;
 
   async function handleFile(file: File) {
@@ -175,11 +174,6 @@ export function AnchorView({
         )}
         {error && <div className="error-text">{error}</div>}
         {unavailable && anchorStatus?.message && <div className="status-note">{anchorStatus.message}</div>}
-        {originaCannotPay && (
-          <div className="status-note">
-            Anchoring without a wallet is paused. Connect a wallet to pay for the anchor yourself.
-          </div>
-        )}
 
         <div className={`reveal${bytes ? " open" : ""}`}>
           <label className="field-label" htmlFor="model-input">
@@ -211,12 +205,12 @@ export function AnchorView({
           </div>
 
           <label className="field-label" style={{ marginTop: 14 }}>
-            Your wallet (optional)
+            Your wallet
           </label>
           {chain.walletCannotSign ? (
             <p className="muted-line">
               {chain.connectedWalletName} is connected but can&apos;t sign for Solana {CLUSTER}. In Phantom, turn on
-              Settings → Developer Settings → Testnet Mode. Until then the record is anchored without a creator.
+              Settings → Developer Settings → Testnet Mode, then reconnect. Anchoring needs a wallet that can sign.
             </p>
           ) : chain.address ? (
             <>
@@ -243,9 +237,8 @@ export function AnchorView({
           ) : (
             <>
               <p className="muted-line">
-                Connect a wallet to be recorded as the creator. It pays the record&apos;s deposit
-                {cost ? <> (about {formatSol(cost.rentLamports + cost.feeLamports)} devnet SOL)</> : null}. Or anchor
-                without one and Origina pays.
+                Connect a wallet to anchor this image. It is recorded as the creator and pays the record&apos;s deposit
+                {cost ? <> (about {formatSol(cost.rentLamports + cost.feeLamports)} devnet SOL)</> : null}.
               </p>
               <WalletList chain={chain} />
             </>
@@ -262,12 +255,17 @@ export function AnchorView({
             {status === "working" ? (
               <>
                 <span className="spinner" />
-                {chain.address ? "Anchoring — approve in your wallet…" : "Anchoring…"}
+                Anchoring — approve in your wallet…
               </>
             ) : status === "done" ? (
               <>
                 <Icon name={result?.alreadyAnchored ? "info" : "check"} />
                 {result?.alreadyAnchored ? "Already anchored" : "Anchored on Solana"}
+              </>
+            ) : !payingWallet ? (
+              <>
+                <Icon name="wallet" />
+                Connect a wallet to anchor
               </>
             ) : (
               <>
@@ -278,8 +276,8 @@ export function AnchorView({
           </button>
           <p className="micro">
             Only the cryptographic fingerprint is written on-chain — your image never leaves your device. Network:
-            Solana {CLUSTER}. Origina is the registered provider. A connected wallet pays the record&apos;s deposit and
-            the network fee; with no wallet, Origina pays.
+            Solana {CLUSTER}. Origina is the registered provider. Your connected wallet is recorded as the creator and pays
+            the record&apos;s deposit and the network fee.
           </p>
         </div>
 
@@ -311,9 +309,6 @@ export function AnchorView({
                   {truncateHash(result.record.signature)} ↗
                 </a>
               </Row>
-            )}
-            {result.creatorSkipped && (
-              <div className="result-note">Your wallet can&apos;t co-sign, so this record has no creator.</div>
             )}
             <button type="button" className="next-link" onClick={onGoSocial}>
               Now go to the Social page to see this image verified in a feed <Icon name="arrow" />
