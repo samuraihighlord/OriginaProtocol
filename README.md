@@ -15,6 +15,8 @@ This repo has two parts:
 
 The image never leaves the browser; only its fingerprint goes on-chain.
 
+The Social page applies the same lookup to posts: every image posted there is scanned against the on-chain records, and a post whose image matches an anchored one (exactly, or as a perceptually similar edited copy) is tagged with the Origina badge automatically. The badge opens the model and a link to the Solana transaction. Posts are session-only and not stored.
+
 ### The provenance record
 
 The browser builds one record per upload and keeps it, keyed by the file's SHA-256, in an in-memory Map (`lib/recordStore.ts`). Where each field ends up on-chain:
@@ -92,7 +94,7 @@ Anchoring needs Origina's provider wallet to be registered, funded and configure
 
 1. **Create the wallet** and keep the file out of git: `solana-keygen new --outfile origina-provider.json`. Share only its address (`solana address -k origina-provider.json`).
 2. **Initialize the registry.** `init_registry` can only be signed by the program's *upgrade authority* (the wallet that deployed it); see `anchor/README.md`. As of writing the devnet registry has not been initialized.
-3. **Approve the wallet.** The registry authority calls `approve_provider(provider, name, c2pa_cert_identity)` with the wallet's address and the name `Origina`.
+3. **Approve the wallet.** The registry authority calls `approve_provider(provider, name, c2pa_cert_identity)` with the wallet's address and the name `Origina`. Only the authority's key can sign this; `AUTHORITY_KEYPAIR=<file> PROVIDER_ADDRESS=<address> pnpm approve:provider` does it in one command and refuses anything but the real authority. The registry authority can be handed over with `pnpm propose:authority` (current authority) and `pnpm accept:authority` (the successor).
 4. **Claim it.** The provider wallet signs `claim_provider` once to activate the registration (the scripts in `app/scripts` show how).
 5. **Fund it** with a little devnet SOL, enough to pay the fee for the one-time claim and to keep the account in existence. Each anchor's rent is reimbursed by the connected wallet in the same transaction, so anchoring doesn't spend Origina's SOL.
 6. **Configure the server.** Set `ORIGINA_PROVIDER_SECRET_KEY` to the contents of the keypair file (in Vercel: Project Settings → Environment Variables). It is read only on the server. Redeploy after setting it.

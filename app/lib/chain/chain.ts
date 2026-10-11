@@ -194,11 +194,12 @@ export async function getRecord(rpc: ChainRpc, address: Address): Promise<OnChai
 }
 
 /**
- * What was recorded alongside a record: the Memo in the transaction that created it. A record account is only ever
- * touched by that one transaction, so its oldest signature is the creation. Memos are untrusted data and are
- * validated before use; null when there is no (valid) memo or the RPC can no longer serve the transaction.
+ * The transaction that created a record, and what was recorded alongside it: the Memo in that transaction. A record
+ * account is only ever touched by that one transaction, so its oldest signature is the creation. Memos are untrusted
+ * data and are validated before use. Null when the RPC can no longer serve the creation transaction; `memo` is null
+ * when it carries no (valid) memo.
  */
-export async function getRecordMemo(rpc: ChainRpc, recordAddress: Address) {
+export async function getRecordCreation(rpc: ChainRpc, recordAddress: Address) {
   try {
     const signatures = await rpc.getSignaturesForAddress(recordAddress, { limit: 10, commitment: "confirmed" }).send();
     const creation = [...signatures].reverse().find((s) => s.err === null);
@@ -207,15 +208,21 @@ export async function getRecordMemo(rpc: ChainRpc, recordAddress: Address) {
       .getTransaction(creation.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0, commitment: "confirmed" })
       .send();
     const instructions = (tx?.transaction.message.instructions ?? []) as readonly { program?: string; parsed?: unknown }[];
+    let memo: ReturnType<typeof parseAnchorMemo> = null;
     for (const ix of instructions) {
       if (ix.program !== "spl-memo") continue;
-      const memo = parseAnchorMemo(ix.parsed);
-      if (memo) return memo;
+      memo = parseAnchorMemo(ix.parsed);
+      if (memo) break;
     }
-    return null;
+    return { signature: creation.signature as string, memo };
   } catch {
     return null;
   }
+}
+
+/** Just the memo of a record's creation transaction (see getRecordCreation). */
+export async function getRecordMemo(rpc: ChainRpc, recordAddress: Address) {
+  return (await getRecordCreation(rpc, recordAddress))?.memo ?? null;
 }
 
 export async function getRecordModel(rpc: ChainRpc, recordAddress: Address): Promise<string | null> {

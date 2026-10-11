@@ -11,7 +11,7 @@
  */
 import { type Address, type Rpc, type SolanaRpcApi, type TransactionSigner, address } from "@solana/kit";
 import type { AnchorFields, AnchorStatus } from "./anchorApi";
-import { findMatch, getProviderName, getRecord, getRecordMemo, getRecordModel, getSlotTime } from "./chain/chain";
+import { findMatch, getProviderName, getRecord, getRecordCreation, getRecordMemo, getSlotTime } from "./chain/chain";
 import { explorerAddressUrl, explorerTxUrl } from "./chain/config";
 import { anchorWithOrigina, canCosign, fetchAnchorStatus } from "./chain/cosign";
 import { computePHash, computeSHA256 } from "./hash";
@@ -60,6 +60,9 @@ export interface VerifyResult {
   model: string | null;
   recordAddress: string | null;
   recordUrl: string | null;
+  /** The transaction that created the record, when it can be found. */
+  signature: string | null;
+  transactionUrl: string | null;
   slot: number | null;
   timestamp: number | null;
 }
@@ -200,16 +203,18 @@ export class OriginaClient {
         model: null,
         recordAddress: null,
         recordUrl: null,
+        signature: null,
+        transactionUrl: null,
         slot: null,
         timestamp: null,
       };
     }
 
     const { record } = match;
-    const [providerName, timestamp, model] = await Promise.all([
+    const [providerName, timestamp, creation] = await Promise.all([
       getProviderName(rpc, record.provider),
       getSlotTime(rpc, record.slot),
-      getRecordModel(rpc, record.address),
+      getRecordCreation(rpc, record.address),
     ]);
     return {
       found: true,
@@ -220,9 +225,11 @@ export class OriginaClient {
       provider: record.provider,
       providerName,
       creatorWallet: record.creatorWallet,
-      model,
+      model: creation?.memo?.model ?? null,
       recordAddress: record.address,
       recordUrl: explorerAddressUrl(record.address),
+      signature: creation?.signature ?? null,
+      transactionUrl: creation ? explorerTxUrl(creation.signature) : null,
       slot: Number(record.slot),
       timestamp,
     };

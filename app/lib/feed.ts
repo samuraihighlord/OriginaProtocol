@@ -10,9 +10,13 @@ export interface Provenance {
   timestamp: number | null;
   recordAddress: string | null;
   recordUrl: string | null;
-  /** The transaction that created the record, when this session created it. */
+  /** The transaction that created the record, when it can be found. */
   signature?: string | null;
   transactionUrl?: string | null;
+  /** How a posted image matched an anchored one: byte-identical, or a perceptually similar (edited) copy. */
+  matchType?: "exact" | "near";
+  /** Hamming distance between perceptual hashes for a near match. */
+  distance?: number;
   /** True for the seeded sample posts: illustrative content, not a real on-chain record. */
   sample?: boolean;
 }

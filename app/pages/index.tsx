@@ -29,13 +29,13 @@ const BANNERS: Record<BannerPage, JSX.Element> = {
   social: (
     <>
       <strong>Platform view.</strong> Posts carrying an Origina badge have a provenance record — click
-      the badge to see which model made the image and open its Solana record. Images you anchor appear at
-      the top of the feed.
+      the badge to see which model made the image and open its Solana record. Post an image and it is scanned
+      against the on-chain records: if it was anchored, it gets the badge automatically.
     </>
   ),
 };
 
-/** A post for an image anchored in this session. Read-only, like the rest of the feed. */
+/** A post for an image anchored in this session. */
 function anchoredPost(image: AnchoredImage): FeedPost {
   const { record, recordUrl, transactionUrl, providerName } = image.result;
   return {
@@ -150,7 +150,7 @@ export default function Home() {
         </section>
         <section className="page" hidden={view !== "social"}>
           {banner("social")}
-          <SocialView anchoredPosts={anchoredPosts} onToast={showToast} />
+          <SocialView client={chain.client} anchoredPosts={anchoredPosts} onToast={showToast} />
         </section>
       </main>
     </>

@@ -10,6 +10,9 @@
     "generate:client": "node scripts/generate-client.mjs",
     "setup:local": "tsx scripts/local-setup.ts",
     "claim:provider": "tsx scripts/claim-provider.ts",
+    "approve:provider": "tsx scripts/approve-provider.ts",
+    "propose:authority": "tsx scripts/propose-authority.ts",
+    "accept:authority": "tsx scripts/accept-authority.ts",
     "test:chain": "tsx scripts/chain-integration.ts"
   },
   "dependencies": {

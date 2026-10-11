@@ -39,6 +39,10 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
             <em>Generated with</em> <span className="mono t-teal">{provenance.model ?? "an unknown model"}</span>
           </p>
 
+          {provenance.matchType === "near" && (
+            <p className="prov-sample">This looks like an edited copy of an anchored image, not the original file.</p>
+          )}
+
           {href ? (
             <a className="btn btn-primary btn-block prov-link" href={href} target="_blank" rel="noopener noreferrer">
               {linksToTransaction ? "View Solana transaction ↗" : "View Solana record ↗"}
