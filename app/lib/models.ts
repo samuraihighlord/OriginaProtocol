@@ -3,18 +3,6 @@
  * same transaction as the record, as a standard Solana Memo (see AnchorMemo).
  */
 
-export const MODEL_OPTIONS = [
-  "Midjourney",
-  "DALL-E 3",
-  "Stable Diffusion XL",
-  "Adobe Firefly",
-  "Flux",
-  "Imagen",
-  "Ideogram",
-] as const;
-
-export const OTHER_MODEL = "Other";
-
 export const MAX_MODEL_LENGTH = 64;
 
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._+\-/]*$/;

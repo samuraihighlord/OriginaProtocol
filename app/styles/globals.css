@@ -533,7 +533,7 @@ h1, h2, h3, .glow-text {
 p, span, li, label { text-shadow: 0 0 8px rgba(255, 255, 255, 0.1); }
 
 /* teal accent text and labels */
-a, .t-teal, .eyebrow.t-teal, .schema-item .k, .result-title, .how-big-num {
+a, .t-teal, .eyebrow.t-teal, .result-title, .how-big-num {
   text-shadow: 0 0 10px rgba(29, 158, 117, 0.4), 0 0 20px rgba(29, 158, 117, 0.2), 0 0 40px rgba(29, 158, 117, 0.1);
 }
 /* muted text: half the white glow */
