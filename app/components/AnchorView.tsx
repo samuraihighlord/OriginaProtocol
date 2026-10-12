@@ -21,22 +21,14 @@ const formatSol = (lamports: number | bigint) => {
 
 type Status = "idle" | "working" | "done";
 
-/** What the Social feed needs to show an image anchored in this session. */
-export interface AnchoredImage {
-  imageUrl: string;
-  result: AnchorResult;
-}
-
 export function AnchorView({
   client,
   chain,
   onGoSocial,
-  onAnchored,
 }: {
   client: OriginaClient;
   chain: ChainState;
   onGoSocial: () => void;
-  onAnchored: (image: AnchoredImage) => void;
 }) {
   const [bytes, setBytes] = useState<Uint8Array | null>(null);
   const [fileLabel, setFileLabel] = useState("");
@@ -48,7 +40,6 @@ export function AnchorView({
   const [result, setResult] = useState<AnchorResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modelText, setModelText] = useState("");
-  const [fileType, setFileType] = useState("image/png");
   const [anchorStatus, setAnchorStatus] = useState<AnchorStatus | null>(null);
   /** The connected wallet's SOL balance in lamports (null while unknown). */
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -97,7 +88,6 @@ export function AnchorView({
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       setBytes(data);
-      setFileType(file.type || "image/png");
       setFileLabel(describeFile(file, data));
       setPreview(URL.createObjectURL(file));
       const extracted = await client.analyse(data);
@@ -118,13 +108,8 @@ export function AnchorView({
     setResult(null);
     setError(null);
     try {
-      const anchored = await client.anchor({ record, model });
-      setResult(anchored);
+      setResult(await client.anchor({ record, model }));
       setStatus("done");
-      // The feed gets its own copy of the image, so it outlives replacing the one in this page.
-      if (bytes) {
-        onAnchored({ imageUrl: URL.createObjectURL(new Blob([bytes.slice()], { type: fileType })), result: anchored });
-      }
       refreshBalance();
     } catch (err) {
       setError(describeChainError(err));
@@ -311,7 +296,7 @@ export function AnchorView({
               </Row>
             )}
             <button type="button" className="next-link" onClick={onGoSocial}>
-              Now go to the Social page to see this image verified in a feed <Icon name="arrow" />
+              Post it on the Social page to see it verified <Icon name="arrow" />
             </button>
           </div>
         )}
@@ -392,7 +377,7 @@ function ExistingRecord({
         </a>
       </Row>
       <button type="button" className="next-link" onClick={onGoSocial}>
-        See this image verified in a feed <Icon name="arrow" />
+        Post it on the Social page to see it verified <Icon name="arrow" />
       </button>
     </div>
   );

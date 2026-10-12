@@ -96,12 +96,9 @@ function PostCard({
 
 export function SocialView({
   client,
-  anchoredPosts,
   onToast,
 }: {
   client: OriginaClient;
-  /** Images anchored in this session, newest first. */
-  anchoredPosts: FeedPost[];
   onToast: (message: string, duration?: number) => void;
 }) {
   const [feedTab, setFeedTab] = useState<FeedTab>("foryou");
@@ -127,7 +124,7 @@ export function SocialView({
   const closeDrawer = useCallback(() => setOpenPost(null), []);
 
   // hasOrigina is "this post carries a provenance record".
-  const posts = [...userPosts, ...anchoredPosts, ...FEED_POSTS].filter((p) => feedTab === "foryou" || !!p.provenance);
+  const posts = [...userPosts, ...FEED_POSTS].filter((p) => feedTab === "foryou" || !!p.provenance);
 
   function toggle(id: string, key: "liked" | "reposted") {
     setInteractions((prev) => ({ ...prev, [id]: { ...prev[id], [key]: !prev[id]?.[key] } }));
