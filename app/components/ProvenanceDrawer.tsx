@@ -1,9 +1,11 @@
 import { useEffect } from "react";
-import { truncateAddress, truncateHash } from "../lib/format";
+import { explorerAddressUrl, explorerTxUrl } from "../lib/chain/config";
 import type { Provenance } from "../lib/feed";
-import { modelLabel } from "../lib/models";
-import { Row } from "./Row";
 
+/**
+ * What a platform shows about an AI-generated post: that it is AI-generated, which model made it, and a link to the
+ * Solana record. Everything else in the record (hashes, creator, slot, timestamp, bump) is stored, not shown here.
+ */
 export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenance; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -13,61 +15,41 @@ export function ProvenanceDrawer({ provenance, onClose }: { provenance: Provenan
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The transaction when this session created the record, else the record's account. Sample posts have neither,
+  // and no link is made up for them.
+  const href = provenance.signature
+    ? explorerTxUrl(provenance.signature)
+    : provenance.recordAddress
+    ? explorerAddressUrl(provenance.recordAddress)
+    : null;
+  const linksToTransaction = !!provenance.signature;
+
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="grad-border modal-sm">
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="prov-title">
-          <div className="drawer-head">
-            <h2 id="prov-title">
-              <span className="mini-mark" style={{ width: 22, height: 22, fontSize: 12, borderRadius: 6 }}>
-                O
-              </span>
-              Provenance record
-            </h2>
-            <button type="button" className="drawer-close" aria-label="Close" onClick={onClose}>
-              ×
-            </button>
-          </div>
+        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="prov-label">
+          <button type="button" className="drawer-close prov-close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
 
-          <Row label="Model" mono={false}>
-            {modelLabel(provenance.modelId)}
-          </Row>
-          <Row label="Creator">
-            <span title={provenance.creator}>{truncateAddress(provenance.creator, 6, 6)}</span>
-          </Row>
-          <Row label="Anchored" mono={false}>
-            {new Date(provenance.timestamp * 1000).toLocaleString()}
-          </Row>
-          {provenance.slot != null && <Row label="Solana slot">{provenance.slot}</Row>}
-          {provenance.pdaAddress && <Row label="PDA address">{provenance.pdaAddress}</Row>}
-          <Row label="SHA-256">
-            <span title={provenance.sha256}>{truncateHash(provenance.sha256)}</span>
-          </Row>
-          {provenance.matchType && (
-            <Row label="Match type" mono={false}>
-              {provenance.matchType === "exact" ? (
-                <span className="match-exact">Exact match (SHA-256)</span>
-              ) : (
-                <span className="match-near">Near match (pHash)</span>
-              )}
-            </Row>
-          )}
+          <p id="prov-label" className="prov-label glow-text">
+            AI-generated content
+          </p>
+          <p className="prov-model">
+            <em>Generated with</em> <span className="mono t-teal">{provenance.model ?? "an unknown model"}</span>
+          </p>
+
           {provenance.matchType === "near" && (
-            <Row label="pHash Hamming distance" mono={false}>
-              {provenance.distance} bits
-            </Row>
+            <p className="prov-sample">This looks like an edited copy of an anchored image, not the original file.</p>
           )}
 
-          {provenance.explorerUrl && (
-            <div style={{ marginTop: 14 }}>
-              <a href={provenance.explorerUrl} target="_blank" rel="noopener noreferrer">
-                View transaction on Solana Explorer ↗
-              </a>
-            </div>
+          {href ? (
+            <a className="btn btn-primary btn-block prov-link" href={href} target="_blank" rel="noopener noreferrer">
+              {linksToTransaction ? "View Solana transaction ↗" : "View Solana record ↗"}
+            </a>
+          ) : (
+            <p className="prov-sample">Sample post: illustrative only, with no on-chain record to open.</p>
           )}
-          <div className="status-note" style={{ marginTop: 14 }}>
-            On-chain verification is still being connected, so this record is not yet anchored on Solana.
-          </div>
         </div>
       </div>
     </div>

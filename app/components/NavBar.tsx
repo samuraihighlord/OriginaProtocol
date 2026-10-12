@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { CLUSTER } from "../lib/chain/config";
+import type { ChainState } from "../lib/chain/useChain";
 import { truncateAddress } from "../lib/format";
-import { Icon, type IconName } from "./Icon";
+import { Icon } from "./Icon";
+import { LogoMark } from "./LogoMark";
+import { Wordmark } from "./Wordmark";
+import { WalletList } from "./WalletPanels";
 
-export type View = "about" | "anchor" | "social";
+export type View = "home" | "anchor" | "social";
 
-const TABS: { view: View; label: string; icon: IconName }[] = [
-  { view: "about", label: "About", icon: "info" },
-  { view: "anchor", label: "Anchor", icon: "link" },
-  { view: "social", label: "Social", icon: "chat" },
-];
-
-const SOL_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-
-function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w: string | null) => void }) {
+function WalletMenu({ chain }: { chain: ChainState }) {
   const [open, setOpen] = useState(false);
-  const [input, setInput] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const { address, connectedWalletName, status, disconnect, walletError } = chain;
 
   useEffect(() => {
     if (!open) return;
@@ -34,24 +30,6 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
     };
   }, [open]);
 
-  function toggle() {
-    if (!open) {
-      setInput(wallet ?? "");
-      setError(null);
-    }
-    setOpen((o) => !o);
-  }
-
-  function confirm() {
-    const value = input.trim();
-    if (!SOL_ADDRESS.test(value)) {
-      setError("That doesn't look like a valid Solana address (32–44 base58 characters).");
-      return;
-    }
-    onChange(value);
-    setOpen(false);
-  }
-
   return (
     <div className="nav-right" ref={ref}>
       <button
@@ -60,62 +38,55 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
         id="wallet-btn"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={toggle}
+        onClick={() => setOpen((o) => !o)}
       >
-        {wallet ? (
+        {address ? (
           <>
             <span className="dot" />
-            <span className="mono">{truncateAddress(wallet, 8, 4)}</span>
+            <span className="mono">{truncateAddress(address, 4, 4)}</span>
           </>
         ) : (
           <>
             <Icon name="wallet" />
-            <span>Connect wallet</span>
+            <span>{status === "connecting" ? "Connecting…" : "Connect wallet"}</span>
           </>
         )}
       </button>
 
       {open && (
-        <div className="popover" role="dialog" aria-label="Connect wallet">
-          <p>
-            Paste a Solana address to act as the creator on your records. Direct wallet connections
-            (Phantom, Backpack) are coming.
-          </p>
-          <label className="field-label" htmlFor="wallet-input">
-            Solana address
-          </label>
-          <input
-            type="text"
-            id="wallet-input"
-            className="mono"
-            placeholder="7xKXqx6Rr8jV7XX9RwtwxWFsn1eScqz9jyqLTQjbxYES"
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && confirm()}
-          />
-          {error && <div className="error-text">{error}</div>}
-          <div className="row" style={{ marginTop: 12 }}>
-            <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={confirm}>
-              {wallet ? "Update address" : "Confirm"}
-            </button>
-            {wallet && (
-              <button
-                type="button"
-                className="btn btn-subtle"
-                onClick={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-              >
-                Disconnect
-              </button>
-            )}
-          </div>
+        <div className="popover" role="dialog" aria-label="Wallet">
+          {address ? (
+            <>
+              <p className="addr">
+                <strong style={{ color: "#fff" }}>{connectedWalletName}</strong>
+                <br />
+                <span className="mono">{address}</span>
+              </p>
+              <p>Your wallet co-signs the record as the creator and pays its devnet SOL deposit and network fee.</p>
+              {walletError && <div className="error-text">{walletError}</div>}
+              <div className="row" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-subtle"
+                  style={{ flex: 1 }}
+                  onClick={async () => {
+                    await disconnect();
+                    setOpen(false);
+                  }}
+                >
+                  Disconnect
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>Connect a Solana wallet to anchor an image. It is recorded as the creator and pays the small devnet SOL deposit and fee.</p>
+              <WalletList chain={chain} />
+              {walletError && <div className="error-text">{walletError}</div>}
+            </>
+          )}
           <p className="note">
-            Your address only labels your records. Nothing is signed or sent from your wallet.
+            Network: Solana {CLUSTER}. Nothing is signed until you press Anchor and approve it in your wallet.
           </p>
         </div>
       )}
@@ -126,52 +97,47 @@ function WalletMenu({ wallet, onChange }: { wallet: string | null; onChange: (w:
 interface NavBarProps {
   view: View;
   onChange: (view: View) => void;
-  wallet: string | null;
-  onWalletChange: (wallet: string | null) => void;
+  chain: ChainState;
 }
 
-export function NavBar({ view, onChange, wallet, onWalletChange }: NavBarProps) {
+const ITEMS: { view: View; label: string; icon: "anchor" | "home" | "chat" }[] = [
+  { view: "anchor", label: "Anchor", icon: "anchor" },
+  { view: "home", label: "Home", icon: "home" },
+  { view: "social", label: "Social", icon: "chat" },
+];
+
+export function NavBar({ view, onChange, chain }: NavBarProps) {
   return (
-    <>
-      <header className="topnav">
-        <div className="brand">
-          <div className="logo-mark">O</div>
-          <span className="brand-name">Origina Protocol</span>
-          <span className="pill">MVP</span>
-        </div>
+    <header className="topnav">
+      <div className="brand">
+        <LogoMark height={36} />
+        <span className="brand-name">
+          <Wordmark height={22} />
+          <span className="brand-sub">Protocol</span>
+        </span>
+        <span className="pill">demo</span>
+      </div>
 
-        <nav className="nav-tabs" role="tablist" aria-label="Pages">
-          {TABS.map((t) => (
+      <nav className="top-nav" aria-label="Pages">
+        {ITEMS.map((item) => {
+          const isHome = item.view === "home";
+          return (
             <button
-              key={t.view}
+              key={item.view}
               type="button"
-              role="tab"
-              aria-selected={view === t.view}
-              className={`tab${view === t.view ? " active" : ""}`}
-              onClick={() => onChange(t.view)}
+              className={`tn-item${isHome ? " tn-home" : ""}${view === item.view ? " active" : ""}`}
+              aria-label={isHome ? "Home" : undefined}
+              aria-current={view === item.view ? "page" : undefined}
+              onClick={() => onChange(item.view)}
             >
-              <Icon name={t.icon} />
-              {t.label}
+              <Icon name={item.icon} />
+              {!isHome && <span>{item.label}</span>}
             </button>
-          ))}
-        </nav>
-
-        <WalletMenu wallet={wallet} onChange={onWalletChange} />
-      </header>
-
-      <nav className="bottom-tabs" aria-label="Pages (mobile)">
-        {TABS.map((t) => (
-          <button
-            key={t.view}
-            type="button"
-            className={`tab${view === t.view ? " active" : ""}`}
-            onClick={() => onChange(t.view)}
-          >
-            <Icon name={t.icon} />
-            {t.label}
-          </button>
-        ))}
+          );
+        })}
       </nav>
-    </>
+
+      <WalletMenu chain={chain} />
+    </header>
   );
 }

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { LogoMark } from "./LogoMark";
+import { Wordmark } from "./Wordmark";
 
 export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) => void }) {
   const [dontShow, setDontShow] = useState(false);
@@ -14,43 +16,45 @@ export function WelcomeModal({ onClose }: { onClose: (dontShowAgain: boolean) =>
       <div className="grad-border modal-lg">
         <div className="modal" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
           <div className="modal-top">
-            <div className="logo-mark">O</div>
-            <h2 id="welcome-title">Origina Protocol</h2>
+            <LogoMark height={52} />
+            <h2 id="welcome-title" className="welcome-title">
+              <Wordmark height={32} />
+              <span className="brand-sub">Protocol</span>
+            </h2>
           </div>
-          <p className="definition">The open-source AI media provenance layer on Solana.</p>
           <hr className="divider" />
-          <div className="modal-cols">
-            <div>
-              <h3 className="eyebrow" style={{ color: "var(--teal)" }}>
-                What Origina does
-              </h3>
-              <p>
-                Origina anchors a cryptographic fingerprint of any AI-generated media permanently on
-                Solana at creation. Any platform can then verify its origin and authenticity without
-                ever storing the file.
-              </p>
-            </div>
-            <div>
-              <h3 className="eyebrow" style={{ color: "var(--text-3)" }}>
-                How it works
-              </h3>
-              <p>
-                Your image is fingerprinted in your browser and never uploaded. Anchor a fingerprint
-                from the Anchor page, then check any image against anchored records from the Social
-                page.
-              </p>
-            </div>
+
+          <div className="modal-block">
+            <h3 className="eyebrow eyebrow-sm t-teal">What you are looking at</h3>
+            <p>
+              This is a proof of concept demo. It exists to demonstrate that the anchoring mechanism works — that a
+              cryptographic fingerprint of an AI-generated image can be extracted in the browser, sent to Solana, and
+              permanently recorded on-chain. <strong><em>This is not the finished product.</em></strong>
+            </p>
           </div>
-          <p className="status-note">
-            MVP release: Solana anchoring is still being connected, so for now records are held in
-            your browser session rather than on-chain.
-          </p>
+
+          <div className="modal-block">
+            <h3 className="eyebrow eyebrow-sm t-muted">What this demo proves</h3>
+            <p>
+              Every image uploaded through this site has its SHA-256 file hash and perceptual hash extracted
+              client-side, plus a C2PA manifest hash when the image carries one, and anchored on Solana with Origina as
+              the named provider. The file never leaves your device. The fingerprint lives on-chain forever. Any
+              platform can verify that record with a single on-chain lookup.
+            </p>
+            <p>
+              This demo is just to show the mechanic.{" "}
+              <strong className="t-teal">
+                The real product is the SDK and API that can be plugged into other web apps.
+              </strong>
+            </p>
+          </div>
+
           <label className="check">
             <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow(e.target.checked)} />
             Don&apos;t show this again
           </label>
           <button type="button" className="btn btn-primary btn-block" onClick={enter}>
-            Get started
+            Enter demo
           </button>
           <a
             className="modal-link"
