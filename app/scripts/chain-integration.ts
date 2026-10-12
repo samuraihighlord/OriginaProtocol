@@ -455,10 +455,18 @@ async function main() {
     check("validator accepts the exact transaction", accepts(base as never));
     check("validator accepts an appended Lighthouse guard that only touches the user's account", accepts(appendInstruction(base as never, LIGHTHOUSE, new Uint8Array([1, 2, 3]), [judge.address])));
     check("validator accepts a capped priority fee", accepts(appendInstruction(base as never, COMPUTE_BUDGET, computeUnitPrice(50_000n))));
-    check("validator refuses an uncapped priority fee", !accepts(appendInstruction(base as never, COMPUTE_BUDGET, computeUnitPrice(5_000_000_000n))));
+    check("validator accepts a large priority fee: it is the wallet's own fee, never Origina's", accepts(appendInstruction(base as never, COMPUTE_BUDGET, computeUnitPrice(5_000_000_000n))));
     check("validator refuses an extra instruction that touches Origina's wallet", !accepts(appendInstruction(base as never, LIGHTHOUSE, new Uint8Array([1]), [origina.address])));
     check("validator refuses an unknown extra program", !accepts(appendInstruction(base as never, "11111111111111111111111111111111", new Uint8Array([2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]), [attacker.address])));
-    check("validator refuses a request-heap-frame compute instruction", !accepts(appendInstruction(base as never, COMPUTE_BUDGET, new Uint8Array([1, 0, 0, 4, 0]))));
+    check("validator accepts a compute-budget instruction of any kind (no accounts, nothing of Origina's)", accepts(appendInstruction(base as never, COMPUTE_BUDGET, new Uint8Array([1, 0, 0, 4, 0]))));
+    check("validator accepts the typical set a wallet adds: limit + price + guard", accepts(appendInstruction(appendInstruction(appendInstruction(base as never, COMPUTE_BUDGET, computeUnitLimit(300_000)), COMPUTE_BUDGET, computeUnitPrice(2_000_000n)), LIGHTHOUSE, new Uint8Array([9]), [judge.address])));
+
+    // A refusal says what it objected to, so a wallet's behaviour can be identified from the message.
+    const why = (t: Transaction) => { try { validateSignedAnchorTransaction(base.messageBytes, t.messageBytes, origina.address); return ""; } catch (e) { return (e as Error).message; } };
+    const stranger = "2gWBqKUPYCZMGEJz4YkjDXyYYZV9RnS9RbQwkdc1DSAH";
+    check("refusal names the unrecognised program the wallet added", why(appendInstruction(base as never, stranger, new Uint8Array([1]), [attacker.address])).includes(stranger));
+    check("refusal says when an added instruction touches Origina's wallet", /touches Origina's wallet/.test(why(appendInstruction(base as never, LIGHTHOUSE, new Uint8Array([1]), [origina.address]))));
+    check("refusals keep the same lead sentence", /^The signed transaction doesn't match this anchor \(/.test(why(appendInstruction(base as never, stranger, new Uint8Array([1]), [attacker.address]))));
   }
 
   // ---- tampering: Origina signs only what it intended ----
